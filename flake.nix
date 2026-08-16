@@ -14,6 +14,10 @@
       # 403s from the deprecated crates.io/api download endpoint.
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    # age-encrypted secrets; decrypted at activation with the machine's
+    # SSH host key (module default identity). See secrets/.
+    agenix.url = "github:ryantm/agenix";
   };
 
   # Binary cache so you DON'T recompile the T2-patched kernel (saves ~1h+).
@@ -29,6 +33,7 @@
     nixpkgs,
     nixos-hardware,
     t2fanrd,
+    agenix,
     ...
   }: {
     nixosConfigurations.donnager = nixpkgs.lib.nixosSystem {
@@ -36,6 +41,7 @@
       modules = [
         nixos-hardware.nixosModules.apple-t2 # all the T2 magic
         t2fanrd.nixosModules.t2fanrd
+        agenix.nixosModules.default
         ./hosts/donnager/default.nix
       ];
     };

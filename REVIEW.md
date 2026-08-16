@@ -5,7 +5,9 @@ Legend: 🔴 blocking · 🟠 security · 🟡 hygiene · ✅ fixed · ℹ️ no
 
 ---
 
-## 🔴 1. t2fanrd build failure — crates.io 403 (BLOCKS `nixos-rebuild`)
+## ✅ 1. t2fanrd build failure — crates.io 403 — FIXED (t2fanrd follows root nixpkgs)
+
+(Original finding kept below for reference.)
 
 Enabling `services.t2fanrd` (see #2) pulls the `t2fanrd 0.1.0` package from the
 **T2FanRD flake** (`github:GnomedDev/T2FanRD`), which builds it from source with
@@ -64,7 +66,9 @@ high_temp=65, speed_curve="exponential"}`.
 
 ---
 
-## 🟠 4. Searxng secret key is a literal placeholder
+## ✅ 4. Searxng secret key was a literal placeholder — FIXED via agenix
+
+(Original finding kept below for reference.)
 
 `hosts/macpro/searx.nix`: `server.secret_key = "@SEARXNG_SECRET@"` — the
 placeholder string is the actual effective value (verified by eval), committed
@@ -87,7 +91,7 @@ If trusted LAN: acceptable. Otherwise bind 8001/9292/8888 to `127.0.0.1`
 
 ---
 
-## 🟡 6. Root `configuration.nix` is dead — delete
+## ✅ 6. Root `configuration.nix` was dead — DELETED
 
 The flake only imports `hosts/macpro/default.nix`. The root file (leftover
 `nixos-generate-config` template, contains commented `hostName = "donager"`
@@ -95,7 +99,7 @@ typo and a conflicting `stateVersion = "26.11"`) is never evaluated and will
 mislead the next editor. `hardware-configuration.nix`'s "edit
 configuration.nix instead" header points at this dead file.
 
-## 🟡 7. `hosts/macpro/llama.nix` is dead *and* broken — delete or finish
+## ✅ 7. `llama.nix` was dead *and* broken — DELETED
 
 Commented out of imports, and its `systemd.services.llama-server` has **no
 `ExecStart`** — enabling it would fail. Superseded by `llama-swap.nix`.
@@ -105,7 +109,7 @@ Commented out of imports, and its `systemd.services.llama-server` has **no
 Machine-specific `/nix/store` symlink tracked in git. `git rm --cached result`
 + add `result` to `.gitignore`.
 
-## 🟡 9. Naming split: `macpro` vs `donnager` (decision required)
+## ✅ 9. Naming split — RESOLVED (renamed to `donnager` everywhere)
 
 Flake key + host dir are `macpro` (`--flake .#macpro`), hostname is `donnager`.
 Works, but renaming key/dir to `donnager` removes a footgun (result symlink
@@ -124,7 +128,7 @@ the `follows` and expect one T2 kernel rebuild/cache-miss.
 
 ---
 
-## 🟡 11. `modules/git/default.nix` — two typos + not imported
+## ✅ 11. `modules/git/default.nix` typos fixed + imported
 
 - `user.user.antoine` → should be `users.users.antoine`
 - `pakgs.git` → `pkgs.git`
@@ -134,7 +138,9 @@ and until then the declarative git identity doesn't exist (manual
 `git config --global` on the box is carrying it). Fix typos, import from
 `hosts/macpro/default.nix`, and it matches the manual config already in place.
 
-## 🟡 12. Qwen chat template not wired up
+## ✅ 12. Qwen chat template — FIXED (froggeric v22.1 via pinned fetchurl)
+
+(Original finding kept below for reference.)
 
 `llama-swap.nix` references `/var/lib/llama/models/chat_template.jinja`
 (runtime path), but the repo's `hosts/macpro/qwen-fixed-template.jinja` is

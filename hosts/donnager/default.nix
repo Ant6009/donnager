@@ -7,11 +7,11 @@
   imports = [
     ../../hardware-configuration.nix
     ./gpu.nix
-#    ./llama.nix
     ./openwebui.nix
     ./searx.nix
     ./llama-swap.nix
     ./t2fanrd.nix
+    ../../modules/git/default.nix
     ../../modules/mcp-servers/default.nix
   ];
   

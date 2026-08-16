@@ -1,8 +1,14 @@
-{ pkgs, ...}:
+{ pkgs, ... }:
 
 {
-  user.user.antoine.packages =  [pakgs.git pkgs.gnupg];
-  user.user.antoine.files."./.gitconfig".text = ''
+  users.users.antoine.packages = [ pkgs.git pkgs.gnupg ];
+
+  # System-wide git identity (/etc/gitconfig) — single-user box.
+  # Git precedence is local > ~/.gitconfig > /etc/gitconfig; the manual
+  # `git config --global` already on the box has identical values, so the
+  # two never conflict. This makes the identity declarative and
+  # reinstall-proof.
+  environment.etc."gitconfig".text = ''
     [user]
       Name = ant6009
       Email = ant.rivoire@gmail.com

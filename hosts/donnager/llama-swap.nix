@@ -1,9 +1,15 @@
 { config, pkgs, lib, ... }:
 let
-  # Repo copy of the Qwen chat template; writeText lifts it into the store
-  # and the generated yaml references the store path (world-readable, so the
-  # 'llama' service user can read it). Keep in sync with the models' needs.
-  qwenTemplate = ./qwen-fixed-template.jinja;
+  # froggeric's fixed Qwen chat template, fetched from the canonical HF repo.
+  # Pinned to a commit + content hash: reproducible builds, and upgrading is
+  # an explicit sha+hash bump (a silent upstream change would fail the hash).
+  # v22.1 is the qwen3.8 template — matches the Qwen3.8 models below and the
+  # reasoning_effort / preserve_reasoning kwargs passed per-model.
+  qwenTemplate = pkgs.fetchurl {
+    url = "https://huggingface.co/froggeric/Qwen-Fixed-Chat-Templates/resolve/2b50d8ef73e9ba606680856aaeb46ab94702e788/chat_template.jinja";
+    hash = "sha256-5NSVVCBkXxpl+4n8Gk7Wdv7nzYIU52o/UgyMjzN4Tac=";
+    name = "qwen-froggeric-chat-template-v22.1.jinja";
+  };
 
   llamaSwapConfig = pkgs.writeText "llama-swap.yaml" ''
     # sanity: how long to wait for a model to come up

@@ -31,12 +31,12 @@
     t2fanrd,
     ...
   }: {
-    nixosConfigurations.macpro = nixpkgs.lib.nixosSystem {
+    nixosConfigurations.donnager = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
         nixos-hardware.nixosModules.apple-t2 # all the T2 magic
         t2fanrd.nixosModules.t2fanrd
-        ./hosts/macpro/default.nix
+        ./hosts/donnager/default.nix
       ];
     };
 

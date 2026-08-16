@@ -11,6 +11,7 @@
     ./openwebui.nix
     ./searx.nix
     ./llama-swap.nix
+    ./t2fanrd.nix
     ../../modules/mcp-servers/default.nix
   ];
   

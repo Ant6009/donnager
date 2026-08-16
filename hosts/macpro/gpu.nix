@@ -12,7 +12,5 @@
   # be explicit on an appliance.
   hardware.enableRedistributableFirmware = true;
 
-  # control GPU fans
-  services.lact.enable = true;
   hardware.amdgpu.overdrive.enable = true;
 }

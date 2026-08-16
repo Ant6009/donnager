@@ -7,7 +7,13 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
     nixos-hardware.url = "github:NixOS/nixos-hardware/master";
-    t2fanrd.url = "github:GnomedDev/T2FanRD";
+    t2fanrd = {
+      url = "github:GnomedDev/T2FanRD";
+      # Follow the root nixpkgs so the cargo-vendor fetcher uses the
+      # static.crates.io CDN endpoint; the old lock (2025 nixpkgs) hit
+      # 403s from the deprecated crates.io/api download endpoint.
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   # Binary cache so you DON'T recompile the T2-patched kernel (saves ~1h+).

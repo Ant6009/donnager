@@ -1,6 +1,9 @@
 { config, pkgs, lib, ... }:
 let
-  qwenTemplate = /var/lib/llama/models/chat_template.jinja;
+  # Repo copy of the Qwen chat template; writeText lifts it into the store
+  # and the generated yaml references the store path (world-readable, so the
+  # 'llama' service user can read it). Keep in sync with the models' needs.
+  qwenTemplate = ./qwen-fixed-template.jinja;
 
   llamaSwapConfig = pkgs.writeText "llama-swap.yaml" ''
     # sanity: how long to wait for a model to come up

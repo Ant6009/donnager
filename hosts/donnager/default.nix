@@ -19,6 +19,9 @@
 
   # ---- Boot ----------------------------------------------------------------
   boot.loader.systemd-boot.enable = true;
+  # /boot is a tiny 300M partition: cap boot entries so old initrds (76M each)
+  # don't fill it up. Rollback still works via nixos-rebuild --rollback.
+  boot.loader.systemd-boot.configurationLimit = 5;
   boot.loader.efi.canTouchEfiVariables = true;
   # Target A (external): Mac firmware finds \EFI\BOOT\BOOTX64.EFI reliably.
   # Uncomment for external installs:

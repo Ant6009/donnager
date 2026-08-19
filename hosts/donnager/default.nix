@@ -86,6 +86,7 @@
   environment.systemPackages = with pkgs; [
     vim
     git
+    pinentry-tty # gpg-agent passphrase prompts over SSH (headless box)
     htop
     btop
     tmux

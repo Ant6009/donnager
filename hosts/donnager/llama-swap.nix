@@ -58,27 +58,27 @@ let
           --model /var/lib/llama/models/Qwen3.6-27B-UD-Q6_K_XL.gguf
           --chat-template-file ${qwenTemplate} 
           --spec-type draft-mtp
-          --spec-draft-n-max 4
+          --spec-draft-n-max 2
           -c 131072
           --chat-template-kwargs '{"preserve_thinking": true}'
           --reasoning-preserve
-          --temp 0.6 --top-p 0.95 --top-k 17
+          --temp 0.8 --top-p 0.95 --top-k 17
           --cache-type-k q8_0 --cache-type-v q8_0
         ttl: 900          # unload after 15 min idle, frees VRAM
         aliases: [ "Clever Qwen", "XL Dense" ]
       
-      Qwen3.8-27b-Q6:
+      Qwen3.8-27b-UD-Q6_K_M:
         cmd: |
           ''${llama-server}
-          --model /var/lib/llama/models/Qwen3.8/Qwen3.8-27B-Q6_K.gguf
+          --model /var/lib/llama/models/Qwen3.8/Qwen3.8-27B-UD-Q6_K_M.gguf
           --chat-template-file ${qwenTemplate} 
           --spec-type draft-mtp
-          --spec-draft-n-max 3
+          --spec-draft-n-max 2
           -c 200000
           --chat-template-kwargs '{"reasoning_effort":"medium"}'
           --kv-unified
           --reasoning-preserve
-          --temp 0.6 --top-p 0.95 --top-k 17
+          --temp 0.8 --top-p 0.95 --top-k 20
           --cache-type-k q8_0 --cache-type-v q8_0
         ttl: 900          # unload after 15 min idle, frees VRAM
         aliases: [ "New Qwen", "3.8 Dense" ] 

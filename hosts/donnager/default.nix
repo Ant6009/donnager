@@ -43,7 +43,17 @@
   # networking.defaultGateway = "192.168.68.1";
   # networking.nameservers = [ "192.168.68.3" ];    # your AdGuard LXC
 
-  networking.firewall.allowedTCPPorts = [22 8001 8080 8888 9292];
+  # SSH (keys only, see below) + services used from the LAN:
+  # roci (pi) → mcp-nixos:8001, searxng:8888, llama-swap:9292;
+  # browser → open-webui:3000. The box sits behind the NAT router
+  # (192.168.68.1), so the LAN is the trust boundary; none of these
+  # ports are reachable from the internet unless the router forwards
+  # them (it doesn't — re-check if that ever changes).
+  # (8080 was a leftover from the deleted llama.nix — nothing listens.)
+  # NixOS's firewall has no per-port source restriction, so per-source
+  # lockdown would mean switching to the nftables backend + custom
+  # ruleset — not worth it on a NATed single-LAN box.
+  networking.firewall.allowedTCPPorts = [ 22 3000 8001 8888 9292 ];
 
   # ---- Headless / SSH ------------------------------------------------------
   services.openssh = {

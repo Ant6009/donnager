@@ -4,7 +4,7 @@ services.open-webui = {
   enable = true;
   host = "0.0.0.0";
   port = 3000;
-  openFirewall = true;
+  # Port 3000 is opened in default.nix (no openFirewall here).
   environment = {
     OPENAI_API_BASE_URL = "http://127.0.0.1:9292/v1";   # llama-server directly
     OPENAI_API_KEY = "sk-noauth";                        # ignored unless you set --api-key

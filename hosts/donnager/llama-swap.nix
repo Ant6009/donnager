@@ -19,61 +19,24 @@ let
       llama-server: >
         ${pkgs.llama-cpp-vulkan}/bin/llama-server
         --host 127.0.0.1 --port ''${PORT}
-        -ngl 999 -fa 1 --jinja
-        --cache-type-k f16 --cache-type-v f16
+        -ngl 999  --jinja
+        --cache-type-k q8_0 --cache-type-v q8_0
 
 
     models:
-      Qwen3.6-27b-Q4:
-        cmd: |
-          ''${llama-server}
-          --model /var/lib/llama/models/Qwen3.6-27B-UD-Q4_K_XL.gguf
-          --chat-template-file ${qwenTemplate} 
-          --spec-type draft-mtp
-          --spec-draft-n-max 4
-          -c 131072  
-          -ub 1024 -b 2048
-          --chat-template-kwargs '{"preserve_thinking": true}'
-          --reasoning-preserve
-        ttl: 900          # unload after 15 min idle, frees VRAM
-        aliases:  [ "medium" ]  
-
-      Qwen3.6-27b-Q5_XL:
-        cmd: |
-          ''${llama-server}
-          --model /var/lib/llama/models/Qwen3.6-27B-UD-Q5_K_XL.gguf
-          --chat-template-file ${qwenTemplate} 
-          --spec-type draft-mtp
-          --spec-draft-n-max 4
-          -c 262144
-          --chat-template-kwargs '{"preserve_thinking": true}'
-          --reasoning-preserve
-          --flash-attn 'on'
-        ttl: 900          # unload after 15 min idle, frees VRAM
-        aliases: [ "default", "chat" ]
-
-      Qwen3.6-27b-Q6:
-        cmd: |
-          ''${llama-server}
-          --model /var/lib/llama/models/Qwen3.6-27B-UD-Q6_K_XL.gguf
-          --chat-template-file ${qwenTemplate} 
-          --spec-type draft-mtp
-          --spec-draft-n-max 2
-          -c 131072
-          --chat-template-kwargs '{"preserve_thinking": true}'
-          --reasoning-preserve
-          --temp 0.8 --top-p 0.95 --top-k 17
-          --cache-type-k q8_0 --cache-type-v q8_0
-        ttl: 900          # unload after 15 min idle, frees VRAM
-        aliases: [ "Clever Qwen", "XL Dense" ]
       
       Qwen3.8-27b-UD-Q6_K_M:
         cmd: |
           ''${llama-server}
           --model /var/lib/llama/models/Qwen3.8/Qwen3.8-27B-UD-Q6_K_M.gguf
           --chat-template-file ${qwenTemplate} 
+          -t 12
           --spec-type draft-mtp
-          --spec-draft-n-max 2
+          --spec-draft-n-max 3
+          --spec-draft-p-min 0.75
+          -ub 512
+          -np 4
+          -fa on
           -c 200000
           --chat-template-kwargs '{"reasoning_effort":"medium"}'
           --kv-unified
@@ -83,72 +46,35 @@ let
         ttl: 900          # unload after 15 min idle, frees VRAM
         aliases: [ "New Qwen", "3.8 Dense" ] 
 
-      gemma-4-12B:
+      Qwen3.8-27b-UD-Q6_K_M Vision:
         cmd: |
           ''${llama-server}
-          --model /var/lib/llama/models/gemma/gemma-4-12B-it-Q6_K_L.gguf
-          # --spec-type draft-mtp
-          # --spec-draft-n-max 2
-          -c 262144   --parallel 2
-        ttl: 900          # unload after 15 min idle, frees VRAM
-        aliases: [ "Gemma 4 12B", "12B XL" ]
-
-      gemma-4-31B:
-        cmd: |
-          ''${llama-server}
-          --model /var/lib/llama/models/gemma/gemma-4-31B-it-Q6_K.gguf
-          # --spec-type draft-mtp
-          # --spec-draft-n-max 2
-          --fit on
-          -c 262144   --parallel 2
-        ttl: 900          # unload after 15 min idle, frees VRAM
-        aliases: [ "Gemma 4 31B", "big gemma" ]
-
-      Qwen3.6-35b-A3b:
-        cmd: |
-          ''${llama-server}
-          --model /var/lib/llama/models/Qwen3.6-35B-A3B-UD-Q8_K_XL.gguf
-          --chat-template-file ${qwenTemplate}
-          --fit on
-          #--n-cpu-moe 16
+          --model /var/lib/llama/models/Qwen3.8/Qwen3.8-27B-UD-Q6_K_M.gguf
+          --mmproj /var/lib/llama/models/Qwen3.8/mmproj-F16.gguf
+          --chat-template-file ${qwenTemplate} 
+          -t 12
           --spec-type draft-mtp
-          --spec-draft-n-max 2
-          --chat-template-kwargs '{"preserve_thinking": true}'
-          -c 64000 
+          --spec-draft-n-max 3
+          --spec-draft-p-min 0.75
+          -ub 512
+          -np 4
+          -fa on
+          -c 180000
+          --chat-template-kwargs '{"reasoning_effort":"medium"}'
+          --kv-unified
+          --reasoning-preserve
+          --temp 0.8 --top-p 0.95 --top-k 20
+          --cache-type-k q8_0 --cache-type-v q8_0
         ttl: 900          # unload after 15 min idle, frees VRAM
-        aliases: [ "Big MoE", "XL Sparse" ]
-
-      laguna-s-2.1-Q4:
-        cmd: |
-          ''${llama-server}
-          --model /var/lib/llama/models/laguna-s-2.1-Q4_K_M.gguf
-          --fit on
-          #--n-cpu-moe 16
-          #--spec-type draft-mtp
-          #--spec-draft-n-max 2
-          --chat-template-kwargs '{"preserve_thinking": true}'
-          -c 64000 
-        ttl: 900          # unload after 15 min idle, frees VRAM
-        aliases: [ "Big Laguna" ]
-      
-      laguna-s-2.1-Q2:
-        cmd: |
-          ''${llama-server}
-          --model /var/lib/llama/models/Laguna-S-2.1-UD-Q2_K_XL.gguf
-          --fit on
-          #--n-cpu-moe 16
-          #--spec-type draft-mtp
-          #--spec-draft-n-max 2
-          --chat-template-kwargs '{"preserve_thinking": true}'
-          -c 64000 
-        ttl: 900          # unload after 15 min idle, frees VRAM
-        aliases: [ "Small Laguna" ]
+        aliases: [ "Vision Qwen", "3.8 Dense Vision" ] 
 
       Ornith:
         cmd: | 
           ''${llama-server}
-          --model /var/lib/llama/models/ornith-1.0-35b-Q5_K_M.gguf
+          --model /var/lib/llama/models/Ornith-1.5-35B-Q5_K_M.gguf
+          --mmproj /var/lib/llama/models/mmproj-Ornith-1.5-35B-BF16.gguf 
           -c 131072  
+          --kv-unified
           --temp 0.6 --top-p 0.95
           --reasoning-preserve
           -ngl 99

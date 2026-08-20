@@ -42,7 +42,6 @@ let
           --kv-unified
           --reasoning-preserve
           --temp 0.8 --top-p 0.95 --top-k 20
-          --cache-type-k q8_0 --cache-type-v q8_0
         ttl: 900          # unload after 15 min idle, frees VRAM
         aliases: [ "New Qwen", "3.8 Dense" ] 
 
@@ -64,7 +63,6 @@ let
           --kv-unified
           --reasoning-preserve
           --temp 0.8 --top-p 0.95 --top-k 20
-          --cache-type-k q8_0 --cache-type-v q8_0
         ttl: 900          # unload after 15 min idle, frees VRAM
         aliases: [ "Vision Qwen", "3.8 Dense Vision" ] 
 
@@ -73,7 +71,7 @@ let
           ''${llama-server}
           --model /var/lib/llama/models/Ornith-1.5-35B-Q5_K_M.gguf
           --mmproj /var/lib/llama/models/mmproj-Ornith-1.5-35B-BF16.gguf 
-          -c 131072  
+          -c 262144  
           --kv-unified
           --temp 0.6 --top-p 0.95
           --reasoning-preserve

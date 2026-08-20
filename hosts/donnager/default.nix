@@ -56,7 +56,7 @@
     isNormalUser = true;
     extraGroups = ["wheel" "video" "render"];
     openssh.authorizedKeys.keys = [ 
-      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJixPpkSmWnkNAwXZ2t8xZLUqNJbLPmvNvGrlsJa1wpf ant.rivoire@gmail.com"
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJixPpkSmWnkNAwXZ2t8xZLUqNJbLPmvNvGrlsJa1wpf"
 
     ];
   };

@@ -5,7 +5,7 @@ local LLM inference server.
 
 ## Hardware
 
-- Mac Pro 7,1 (2013), T2 chip — T2-patched kernel via `nixos-hardware` `apple-t2`
+- Mac Pro 7,1 (2019), T2 chip — T2-patched kernel via `nixos-hardware` `apple-t2`
 - AMD Radeon Pro Vega II (Vulkan/RADV compute for llama.cpp)
 - Wired 10GbE, behind a NAT router (the LAN is the trust boundary)
 

@@ -71,12 +71,14 @@ let
           ''${llama-server}
           --model /var/lib/llama/models/Ornith-1.5-35B-Q5_K_M.gguf
           --mmproj /var/lib/llama/models/mmproj-Ornith-1.5-35B-BF16.gguf 
+          --chat-template-file ${qwenTemplate} 
           -c 262144  
           --kv-unified
           --temp 0.6 --top-p 0.95
           --reasoning-preserve
           -ngl 99
-          --n-predict 4096
+          --n-predict 2048
+          --image-min-tokens 1024
         ttl: 900
 
       # small utility model that can stay resident ALONGSIDE another:

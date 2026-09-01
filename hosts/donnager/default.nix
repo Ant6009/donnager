@@ -27,7 +27,6 @@
   # Uncomment for external installs:
   # boot.loader.efi.canTouchEfiVariables = false;
   # boot.loader.systemd-boot.efiInstallAsRemovable = true;
-
   # T2 desktops don't need suspend; it's also unreliable. Kill it.
   systemd.targets.sleep.enable = false;
   systemd.targets.suspend.enable = false;

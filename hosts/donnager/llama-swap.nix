@@ -35,7 +35,7 @@ let
           --spec-draft-n-max 3
           --spec-draft-p-min 0.75
           -ub 512
-          -np 4
+          -np 1
           -fa on
           -c 200000
           --chat-template-kwargs '{"reasoning_effort":"medium"}'
@@ -56,7 +56,7 @@ let
           --spec-draft-n-max 3
           --spec-draft-p-min 0.75
           -ub 512
-          -np 4
+          -np 1
           -fa on
           -c 180000
           --chat-template-kwargs '{"reasoning_effort":"medium"}'

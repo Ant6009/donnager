@@ -52,7 +52,7 @@
   # NixOS's firewall has no per-port source restriction, so per-source
   # lockdown would mean switching to the nftables backend + custom
   # ruleset — not worth it on a NATed single-LAN box.
-  networking.firewall.allowedTCPPorts = [ 22 3000 8001 8888 9292 ];
+  networking.firewall.allowedTCPPorts = [ 22 3000 4242 8001 8888 9292 ];
 
   # ---- Headless / SSH ------------------------------------------------------
   services.openssh = {
@@ -117,4 +117,28 @@ nixpkgs.overlays = [
 ];
   time.timeZone = "Europe/London";
   system.stateVersion = "25.11"; # match your nixpkgs
+
+  # ---- 42 (local Perplexity-style answer engine) --------------------------
+  # LLM and SearXNG endpoints are editable at runtime by admins in the UI;
+  # the TOML only seeds initial values plus bind/db path.
+  services.fortytwo.enable = true;
+
+  environment.etc."42/42.toml".text = """
+[server]
+bind = "0.0.0.0:4242"
+
+[llm]
+base_url = "http://127.0.0.1:9292/v1"
+model = "Qwen3.8-27b-UD-Q6_K_M"
+context_window = 32768
+
+[search]
+base_url = "http://127.0.0.1:8888"
+max_sources = 8
+snippet_chars = 500
+
+[database]
+path = "/var/lib/42/42.sqlite"
+history_turns = 10
+""";
 }

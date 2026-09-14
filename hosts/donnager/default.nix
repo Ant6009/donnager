@@ -123,7 +123,7 @@ nixpkgs.overlays = [
   # the TOML only seeds initial values plus bind/db path.
   services.fortytwo.enable = true;
 
-  environment.etc."42/42.toml".text = """
+  environment.etc."42/42.toml".text = ''
 [server]
 bind = "0.0.0.0:4242"
 
@@ -140,5 +140,5 @@ snippet_chars = 500
 [database]
 path = "/var/lib/42/42.sqlite"
 history_turns = 10
-""";
+'';
 }

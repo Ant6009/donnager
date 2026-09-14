@@ -50,11 +50,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1789373540,
-        "narHash": "sha256-BHDp11yu+4Dhh1+3xnT3lzvJ0u0okNlvc7BdrZtARPU=",
+        "lastModified": 1789374483,
+        "narHash": "sha256-Wzemt8w5AqB7DND5GeDuZJj7aaeY12y08lHPYEOwaig=",
         "owner": "Ant6009",
         "repo": "42",
-        "rev": "ee8ac6fd39537ceccf0b7f582914dc47fc2206b7",
+        "rev": "b8db0e0fd0c791f5337d4c9646ed2da5973df20e",
         "type": "github"
       },
       "original": {

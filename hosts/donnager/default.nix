@@ -7,6 +7,7 @@
   imports = [
     ../../hardware-configuration.nix
     ./gpu.nix
+    ./nvidia.nix
     ./openwebui.nix
     ./searx.nix
     ./llama-swap.nix

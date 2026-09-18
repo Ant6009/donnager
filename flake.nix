@@ -11,7 +11,7 @@
     # given 6.18.y. 0ae2bc14 -> linux_6_18 = 6.18.44, the last known-good.
     # Bump this input ONLY after verifying the new 6.18.y kernel still builds;
     # never run bare `nix flake update` (it would move this too).
-    nixpkgs-frozen.url = "github:NixOS/nixpkgs/0ae2bc1419c3f345984c2629e72e7a631820fa4d";
+  #   nixpkgs-frozen.url = "github:NixOS/nixpkgs/0ae2bc1419c3f345984c2629e72e7a631820fa4d";
 
     nixos-hardware.url = "github:NixOS/nixos-hardware/master";
     t2fanrd = {

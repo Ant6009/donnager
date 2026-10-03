@@ -48,7 +48,12 @@
     # Build the T2 kernel AND all of its modules from the frozen nixpkgs so
     # the kernel stays at 6.18.44 no matter how far `nixpkgs` (userspace)
     # rolls. Kept self-consistent (one kernel -> one module set -> one initrd).
-    frozenPkgs = nixpkgs-frozen.legacyPackages.${system};
+    frozenPkgs = (import nixpkgs-frozen {
+      inherit system;
+      # The nvidia driver (unfree) builds from this instance via
+      # boot.kernelPackages.nvidiaPackages; allow it here too.
+      config.allowUnfree = true;
+    }).legacyPackages.${system};
     t2Kernel = frozenPkgs.callPackage (
       nixos-hardware.outPath + "/apple/t2/pkgs/linux-t2"
     ) { };

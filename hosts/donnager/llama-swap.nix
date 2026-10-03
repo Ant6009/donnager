@@ -30,6 +30,7 @@ let
           ''${llama-server}
           --model /var/lib/llama/models/Qwen3.8/Qwen3.8-27B-UD-Q6_K_M.gguf
           --chat-template-file ${qwenTemplate} 
+          --device "Vulkan1"
           -t 12
           --spec-type draft-mtp
           --spec-draft-n-max 3
@@ -50,6 +51,7 @@ let
           ''${llama-server}
           --model /var/lib/llama/models/Qwen3.8/Qwen3.8-27B-UD-Q6_K_M.gguf
           --mmproj /var/lib/llama/models/Qwen3.8/mmproj-F16.gguf
+          --device "Vulkan1"
           --chat-template-file ${qwenTemplate} 
           -t 12
           --spec-type draft-mtp
@@ -72,6 +74,7 @@ let
           --model /var/lib/llama/models/Ornith-1.5-35B-Q5_K_M.gguf
           --mmproj /var/lib/llama/models/mmproj-Ornith-1.5-35B-BF16.gguf 
           --chat-template-file ${qwenTemplate} 
+          --device "Vulkan1"
           -c 262144  
           --kv-unified
           --temp 0.6 --top-p 0.95

@@ -11,7 +11,7 @@
         low_temp = 30;        # start ramping at 40 °C
         high_temp = 65;       # full speed at 65 °C
         speed_curve = "exponential";
-        # always_full_speed = false;
+        always_full_speed = true;
       };
 
       # ── Front intake(s) ──────────────────────────────────────
@@ -19,17 +19,20 @@
         low_temp = 30;
         high_temp = 65;
         speed_curve = "exponential";
+        always_full_speed = true;
       };
 
       Fan3 = {
         low_temp = 30;
         high_temp = 65;
         speed_curve = "exponential";
+        always_full_speed = true;
       };
       Fan4 = {
         low_temp = 30;
         high_temp = 65;
         speed_curve = "exponential";
+        always_full_speed = true;
       };
     };
   };

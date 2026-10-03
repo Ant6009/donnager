@@ -106,7 +106,7 @@
     lm_sensors
     python313Packages.huggingface-hub
     mcp-nixos
-    nvtopPackages.amd
+    nvtopPackages.full
   ];
 
 nixpkgs.overlays = [

@@ -48,7 +48,7 @@ let
 
   # Set to a number of watts to install a oneshot that applies a power limit
   # (200 on the 600 W PSU, 250 after the 1450 W upgrade). null = don't.
-  powerLimitWatts = null;
+  powerLimitWatts = 200;
 
   # --- pinned unlock patchset ------------------------------------------------
   # Bump only deliberately: the patches are specific to the driver version

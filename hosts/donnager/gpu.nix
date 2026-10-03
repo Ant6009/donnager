@@ -3,7 +3,7 @@
   hardware.graphics.enable = true;
 
   # Vega II fires up amdgpu; make sure early KMS is available.
-  hardware.amdgpu.initrd.enable = true;
+  hardware.amdgpu.initrd.enable = false;
 
   # Force RADV in case AMDVLK ever gets pulled in — RADV is what we want here.
   environment.variables.AMD_VULKAN_ICD = "RADV";

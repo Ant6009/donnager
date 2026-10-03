@@ -58,7 +58,7 @@ let
     owner = "amoghmunikote";
     repo = "cmpunlocker";
     rev = "88e39ce67488796b2c6c716fe8f9b4e6e943a55e"; # 2026-09-13, master
-    hash = "sha256-52lIswLRWXwEskxkYaDK55w0giMzMReLgqX3RmQRU/4=";
+    hash = "sha256-4eCNt5yGa6kxsf3qii41lHyL7KE7DNiQFOSarVzTpYw=";
   };
 
   # Names and order are identical to PATCH_ORDER in driver/build.sh, which

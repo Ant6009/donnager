@@ -68,7 +68,7 @@ in
   hardware.nvidia.package = nvidia;
   hardware.nvidia.open = true;               # GA100: open modules only
   hardware.nvidia.modesetting.enable = true; # headless, no X/Wayland
-  services.nvidia-persistenced.enable = true;
+#  hardware.nvidia.nvidia-persistenced.enable = true;
 
   # 64 GB BAR1 after unlock needs large MMIO allocation; also keeps the
   # door open for VFIO passthrough (cmpunlocker supports it).
@@ -82,17 +82,17 @@ in
 
   # Power limit + persistence mode. Final value from the Stage 2 thermal
   # soak: 200 W on the 600 W PSU, 250 W after a 1450 W upgrade.
-  systemd.services.nvidia-powerlimit = {
-    description = "CMP170HX power limit + persistence mode";
-    wantedBy = [ "multi-user.target" ];
-    after = [ "nvidia-persistenced.service" ];
-    serviceConfig = { Type = "oneshot"; User = "root"; };
-    script = ''
-      ${nvidia.bin}/bin/nvidia-smi -pm 1
-      ${nvidia.bin}/bin/nvidia-smi -pl 200
-    '';
-  };
-
+#  systemd.services.nvidia-powerlimit = {
+#    description = "CMP170HX power limit + persistence mode";
+#    wantedBy = [ "multi-user.target" ];
+#    after = [ "hardware.nvidia.nvidiaPersistenced = true" ];
+#    serviceConfig = { Type = "oneshot"; User = "root"; };
+#    script = ''
+#      ${nvidia.bin}/bin/nvidia-smi -pm 1
+#      ${nvidia.bin}/bin/nvidia-smi -pl 200
+#    '';
+#  };
+  #
   # STAGE 3 (GEN2) — early-boot retrain hammer.
   # Port of cmpunlocker tools/hammer.sh + systemd/gen2.service (pinned rev).
   # Patch 0007 opens a Gen2 window ~8-14 s after boot while GSP

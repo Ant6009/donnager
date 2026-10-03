@@ -685,7 +685,15 @@ rebuilds with the 11 patches), then:
 - **R5 — 64 GB BAR on the Mac Pro MMIO map (mitigated, still a gate).**
   Patch 0010 resizes BAR1 in-driver (XVE + REBAR), but a 64 GB MMIO
   allocation on this specific platform is unverified. `intel_iommu=on` is
-  in place; Stage 2.2 is the stop-the-line gate.
+  in place; Stage 2.2 is the stop-the-line gate. The silicon is not the
+  concern (C621 / Xeon W backs 64 GB BARs natively, as A100/H100 80 GB
+  cards do on the same chipset); the risk is Apple's locked EFI not
+  enabling Above-4G decoding or leaving a contiguous 64 GB MMIO window
+  (no setup option to toggle either). If the in-driver resize fails to
+  get an aperture, fall back to a boot-time **ReBarUEFI** / OpenCore UEFI
+  DXE module that forces Resizable BAR + hidden Above-4G decoding; that
+  still only works if the firmware leaves a 64 GB MMIO hole, so the
+  Stage 2.2 `lspci`/`dmesg` check remains the source of truth.
 - **R6 — Xid 31** (allocation past the usable window). Mitigation: Stage 2.3
   stress, record the safe VRAM ceiling, configure llama-swap contexts below
   it.
@@ -744,6 +752,11 @@ rebuilds with the 11 patches), then:
   — community wiki (55 pages): quick-start, risks, driver-versions,
   power-and-psu, cooling, llm-inference, multi-gpu, recovery. Treated as the
   primary hardware reference; it marks single-source claims as such.
+- [`xCuri0/ReBarUEFI`](https://github.com/xCuri0/ReBarUEFI)
+  — boot-time UEFI DXE module that enables Resizable BAR + hidden Above-4G
+  decoding on firmware that doesn't expose them; fallback for R5 if Apple's
+  stock EFI won't back a 64 GB BAR1. Not yet wired in; only if the
+  in-driver resize (patch 0010) fails to get an aperture at Stage 2.2.
 - nixpkgs `0ae2bc1419c3` (frozen) and `d6524aaca2ff` (rolling):
   `pkgs/os-specific/linux/nvidia-x11/{default,generic,kernel-modules,persistenced}.nix`,
   `pkgs/os-specific/linux/kmod/aggregator.nix`,

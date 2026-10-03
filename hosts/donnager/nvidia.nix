@@ -65,6 +65,11 @@ let
   };
 in
 {
+  # Headless, no X — but nixpkgs 26.11 gates hardware.nvidia.enabled on
+  # this (the option is readOnly; default = "nvidia" in videoDrivers).
+  # Without it the whole nvidia config is silently disabled.
+  services.xserver.videoDrivers = [ "nvidia" ];
+
   hardware.nvidia.package = nvidia;
   hardware.nvidia.open = true;               # GA100: open modules only
   hardware.nvidia.modesetting.enable = true; # headless, no X/Wayland
@@ -79,6 +84,9 @@ in
   # hardware.nvidia.moduleParams.nvidia = {
   #   NVreg_RegistryDwords = "RmForceEnableGen2=1;RMPcieLinkSpeed=0x1";
   # };
+
+  # nvidia-smi on PATH (the driver package is not in systemPackages by default).
+  environment.systemPackages = [ nvidia.bin ];
 
   # Power limit + persistence mode. Final value from the Stage 2 thermal
   # soak: 200 W on the 600 W PSU, 250 W after a 1450 W upgrade.

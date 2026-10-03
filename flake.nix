@@ -53,7 +53,7 @@
       # The nvidia driver (unfree) builds from this instance via
       # boot.kernelPackages.nvidiaPackages; allow it here too.
       config.allowUnfree = true;
-    }).legacyPackages.${system};
+    });
     t2Kernel = frozenPkgs.callPackage (
       nixos-hardware.outPath + "/apple/t2/pkgs/linux-t2"
     ) { };

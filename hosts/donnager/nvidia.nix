@@ -81,9 +81,9 @@ in
 
   # STAGE 3 (GEN2) — registry dwords; what cmpunlocker's install.sh writes
   # to /etc/modprobe.d/cmp-pcie-gen2.conf. Inert while the link is Gen1.
-  # hardware.nvidia.moduleParams.nvidia = {
-  #   NVreg_RegistryDwords = "RmForceEnableGen2=1;RMPcieLinkSpeed=0x1";
-  # };
+   hardware.nvidia.moduleParams.nvidia = {
+     NVreg_RegistryDwords = "RmForceEnableGen2=1;RMPcieLinkSpeed=0x1";
+   };
 
   # nvidia-smi on PATH (the driver package is not in systemPackages by default).
   environment.systemPackages = [ nvidia.bin ];
@@ -107,69 +107,69 @@ in
   # bootstraps; this fires root-port retrains every 50 ms until the link
   # catches it (verified field behaviour: success around iteration 30).
   # No-op (exit 0) when no 10de:20c2/2082 is present. Log: /var/log/gen2.log.
-  # systemd.services.cmp170hx-gen2 = {
-  #   description = "CMP 170HX early-boot PCIe Gen2 retrain";
-  #   wantedBy = [ "sysinit.target" ];
-  #   after = [ "sysinit.target" ];
-  #   before = [ "basic.target" ];
-  #   serviceConfig = {
-  #     DefaultDependencies = false;
-  #     Type = "oneshot";
-  #     TimeoutStartSec = 45;
-  #     RemainAfterExit = false;
-  #     User = "root";
-  #   };
-  #   script = ''
-  #     set -uo pipefail
-  #     LSPCI="${pkgs.pciutils}/bin/lspci"
-  #     SETPCI="${pkgs.pciutils}/bin/setpci"
-  #     LOG=/var/log/gen2.log
-  #     TARGET_GEN=2
-  #     MAX_ITER=600
-  #     INTERVAL=0.05
-  #     log() { echo "[$(date -Is)] $*" | tee -a "$LOG"; }
-  #     gen() {
-  #       local s
-  #       s="$($SETPCI -s "$1" CAP_EXP+12.w 2>/dev/null || true)"
-  #       [[ "$s" =~ ^[[:xdigit:]]{4}$ ]] && echo $((0x$s & 0x0f)) || echo "?"
-  #     }
-  #     : > "$LOG"
-  #     mapfile -t gpus < <(
-  #       "$LSPCI" -D -d 10de:20c2 2>/dev/null;
-  #       "$LSPCI" -D -d 10de:2082 2>/dev/null
-  #     )
-  #     [[ ${#gpus[@]} -eq 0 ]] && { log "no CMP 170HX found; nothing touched"; exit 0; }
-  #     rc=0
-  #     for gpu in "${gpus[@]}"; do
-  #       bridge="$(basename "$(dirname "$(readlink -f /sys/bus/pci/devices/$gpu)")")"
-  #       [[ "$(cat /sys/bus/pci/devices/$bridge/class 2>/dev/null)" == 0x0604* ]] \
-  #         || { log "$gpu: no PCI bridge upstream; skipping"; rc=1; continue; }
-  #       cur="$(gen "$gpu")"
-  #       if [[ "$cur" =~ ^[0-9]+$ ]] && (( cur >= TARGET_GEN )); then
-  #         log "$gpu: already Gen$cur; no retrain needed"
-  #         continue
-  #       fi
-  #       log "$gpu: start via $bridge (Gen$cur -> Gen$TARGET_GEN)"
-  #       ok=0
-  #       for ((i = 1; i <= MAX_ITER; i++)); do
-  #         $SETPCI -s "$bridge" CAP_EXP+30.w=0002:000f 2>/dev/null || true
-  #         $SETPCI -s "$gpu"    CAP_EXP+30.w=0002:000f 2>/dev/null || true
-  #         $SETPCI -s "$bridge" CAP_EXP+10.w=0020:0020 2>/dev/null || true
-  #         g="$(gen "$gpu")"
-  #         if [[ "$g" =~ ^[0-9]+$ ]] && (( g >= TARGET_GEN )); then
-  #           log "$gpu: SUCCESS Gen$g at iteration $i"
-  #           ok=1
-  #           break
-  #         fi
-  #         sleep "$INTERVAL"
-  #       done
-  #       if [[ $ok -eq 0 ]]; then
-  #         log "$gpu: no Gen2 window caught after $MAX_ITER attempts; final Gen$(gen "$gpu")"
-  #         rc=1
-  #       fi
-  #     done
-  #     log "early retrain finished (rc=$rc)"
-  #     exit $rc
-  #   '';
-  # };
+   systemd.services.cmp170hx-gen2 = {
+     description = "CMP 170HX early-boot PCIe Gen2 retrain";
+     wantedBy = [ "sysinit.target" ];
+     after = [ "sysinit.target" ];
+     before = [ "basic.target" ];
+     serviceConfig = {
+       DefaultDependencies = false;
+       Type = "oneshot";
+       TimeoutStartSec = 45;
+       RemainAfterExit = false;
+       User = "root";
+     };
+     script = ''
+       set -uo pipefail
+       LSPCI="${pkgs.pciutils}/bin/lspci"
+       SETPCI="${pkgs.pciutils}/bin/setpci"
+       LOG=/var/log/gen2.log
+       TARGET_GEN=2
+       MAX_ITER=600
+       INTERVAL=0.05
+       log() { echo "[$(date -Is)] $*" | tee -a "$LOG"; }
+       gen() {
+         local s
+         s="$($SETPCI -s "$1" CAP_EXP+12.w 2>/dev/null || true)"
+         [[ "$s" =~ ^[[:xdigit:]]{4}$ ]] && echo $((0x$s & 0x0f)) || echo "?"
+       }
+       : > "$LOG"
+       mapfile -t gpus < <(
+         "$LSPCI" -D -d 10de:20c2 2>/dev/null;
+         "$LSPCI" -D -d 10de:2082 2>/dev/null
+       )
+       [[ ${#gpus[@]} -eq 0 ]] && { log "no CMP 170HX found; nothing touched"; exit 0; }
+       rc=0
+       for gpu in "${gpus[@]}"; do
+         bridge="$(basename "$(dirname "$(readlink -f /sys/bus/pci/devices/$gpu)")")"
+         [[ "$(cat /sys/bus/pci/devices/$bridge/class 2>/dev/null)" == 0x0604* ]] \
+           || { log "$gpu: no PCI bridge upstream; skipping"; rc=1; continue; }
+         cur="$(gen "$gpu")"
+         if [[ "$cur" =~ ^[0-9]+$ ]] && (( cur >= TARGET_GEN )); then
+           log "$gpu: already Gen$cur; no retrain needed"
+           continue
+         fi
+         log "$gpu: start via $bridge (Gen$cur -> Gen$TARGET_GEN)"
+         ok=0
+         for ((i = 1; i <= MAX_ITER; i++)); do
+           $SETPCI -s "$bridge" CAP_EXP+30.w=0002:000f 2>/dev/null || true
+           $SETPCI -s "$gpu"    CAP_EXP+30.w=0002:000f 2>/dev/null || true
+           $SETPCI -s "$bridge" CAP_EXP+10.w=0020:0020 2>/dev/null || true
+           g="$(gen "$gpu")"
+           if [[ "$g" =~ ^[0-9]+$ ]] && (( g >= TARGET_GEN )); then
+             log "$gpu: SUCCESS Gen$g at iteration $i"
+             ok=1
+             break
+           fi
+           sleep "$INTERVAL"
+         done
+         if [[ $ok -eq 0 ]]; then
+           log "$gpu: no Gen2 window caught after $MAX_ITER attempts; final Gen$(gen "$gpu")"
+           rc=1
+         fi
+       done
+       log "early retrain finished (rc=$rc)"
+       exit $rc
+     '';
+   };
 }

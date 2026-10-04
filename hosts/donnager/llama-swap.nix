@@ -67,6 +67,52 @@ let
           --temp 0.8 --top-p 0.95 --top-k 20
         ttl: 900          # unload after 15 min idle, frees VRAM
         aliases: [ "Vision Qwen", "3.8 Dense Vision" ] 
+ # 180B MoE (~6B active), UD-Q4_K_XL ~104G: splits across 64G VRAM + RAM,
+      # llama.cpp auto-offloads the MoE experts that don't fit on the card.
+      Qwen3.8-Flash-UD-Q4_K_XL:
+        cmd: |
+          ''${llama-server}
+          --model /var/lib/llama/models/Qwen3.8flash/UD-Q4_K_XL/Qwen3.8-Flash-Next-UD-Q4_K_XL-00001-of-00004.gguf
+          --chat-template-file ${qwenTemplate} 
+          --device "CUDA0"
+          -t 12
+          --spec-type draft-mtp
+          --spec-draft-model /var/lib/llama/models/Qwen3.8flash/MTP/mtp-Qwen3.8-Flash-Next-shared-Q4_K_M.gguf
+          --spec-draft-n-max 3
+          --spec-draft-p-min 0.75
+          -ub 512
+          -np 1
+          -fa on
+          -c 131072
+          --chat-template-kwargs '{"reasoning_effort":"medium"}'
+          --kv-unified
+          --reasoning-preserve
+          --temp 0.8 --top-p 0.95 --top-k 20
+        ttl: 900
+        aliases: [ "Flash", "3.8 Flash" ]
+
+      Qwen3.8-Flash-UD-Q4_K_XL Vision:
+        cmd: |
+          ''${llama-server}
+          --model /var/lib/llama/models/Qwen3.8flash/UD-Q4_K_XL/Qwen3.8-Flash-Next-UD-Q4_K_XL-00001-of-00004.gguf
+          --mmproj /var/lib/llama/models/Qwen3.8flash/mmproj-F16.gguf
+          --chat-template-file ${qwenTemplate} 
+          --device "CUDA0"
+          -t 12
+          --spec-type draft-mtp
+          --spec-draft-model /var/lib/llama/models/Qwen3.8flash/MTP/mtp-Qwen3.8-Flash-Next-shared-Q4_K_M.gguf
+          --spec-draft-n-max 3
+          --spec-draft-p-min 0.75
+          -ub 512
+          -np 1
+          -fa on
+          -c 131072
+          --chat-template-kwargs '{"reasoning_effort":"medium"}'
+          --kv-unified
+          --reasoning-preserve
+          --temp 0.8 --top-p 0.95 --top-k 20
+        ttl: 900
+        aliases: [ "Flash Vision" ]
 
       Ornith:
         cmd: | 

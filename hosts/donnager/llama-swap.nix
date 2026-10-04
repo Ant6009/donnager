@@ -17,7 +17,7 @@ let
 
     macros:
       llama-server: >
-        ${pkgs.llama-cpp-vulkan}/bin/llama-server
+        ${pkgs.llama-cpp-cuda}/bin/llama-server
         --host 127.0.0.1 --port ''${PORT}
         -ngl 999  --jinja
         --cache-type-k q8_0 --cache-type-v q8_0
@@ -38,7 +38,7 @@ let
           -ub 512
           -np 1
           -fa on
-          -c 200000
+          -c 262144
           --chat-template-kwargs '{"reasoning_effort":"medium"}'
           --kv-unified
           --reasoning-preserve
@@ -60,7 +60,7 @@ let
           -ub 512
           -np 1
           -fa on
-          -c 180000
+          -c 262144
           --chat-template-kwargs '{"reasoning_effort":"medium"}'
           --kv-unified
           --reasoning-preserve
@@ -97,7 +97,7 @@ in
     after = [ "network-online.target" ];
     wants = [ "network-online.target" ];
 
-    environment.AMD_VULKAN_ICD = "RADV";
+    #environment.AMD_VULKAN_ICD = "RADV";
     environment.XDG_CACHE_HOME = "/var/cache/llama";   # keeps the shader-cache fix
 
     serviceConfig = {

@@ -6,7 +6,7 @@
   hardware.amdgpu.initrd.enable = false;
 
   # Force RADV in case AMDVLK ever gets pulled in — RADV is what we want here.
-  environment.variables.AMD_VULKAN_ICD = "RADV";
+ # environment.variables.AMD_VULKAN_ICD = "RADV";
 
   # Redistributable firmware (amdgpu Vega20 microcode) — usually implied, but
   # be explicit on an appliance.

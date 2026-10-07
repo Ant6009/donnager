@@ -33,12 +33,14 @@ let
           --device "CUDA0"
           -t 12
           --spec-type draft-mtp
-          --spec-draft-n-max 3
-          --spec-draft-p-min 0.75
-          -ub 512
+          --spec-draft-n-max 8
+          --spec-draft-p-min 0.8
+          -ub 1024
+          --cache-reuse 256
           -np 1
           -fa on
           -c 262144
+          --metrics
           --chat-template-kwargs '{"reasoning_effort":"medium"}'
           --kv-unified
           --reasoning-preserve
@@ -55,12 +57,14 @@ let
           --chat-template-file ${qwenTemplate} 
           -t 12
           --spec-type draft-mtp
-          --spec-draft-n-max 3
-          --spec-draft-p-min 0.75
-          -ub 512
+          --spec-draft-n-max 8
+          --spec-draft-p-min 0.8
+          -ub 1024
+          --cache-reuse 256
           -np 1
           -fa on
           -c 262144
+          --metrics
           --chat-template-kwargs '{"reasoning_effort":"medium"}'
           --kv-unified
           --reasoning-preserve

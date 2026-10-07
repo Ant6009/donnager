@@ -40,7 +40,7 @@
   # Static IP so the AdGuard record donnager.lan -> 192.168.68.128 (used by
   # the Caddy HTTPS front for Open WebUI on phones) can't rot via DHCP.
   networking.useDHCP = false;
-  networking.interfaces.enp5s0.ipv4.addresses = [{
+  networking.interfaces.enp4s0.ipv4.addresses = [{
     address = "192.168.68.128"; prefixLength = 24;
   }];
   networking.defaultGateway = "192.168.68.1";

@@ -12,6 +12,7 @@
     ./searx.nix
     ./llama-swap.nix
     ./t2fanrd.nix
+    ./caddy.nix
     ../../modules/git/default.nix
     ../../modules/mcp-servers/default.nix
   ];
@@ -36,12 +37,14 @@
 
   # ---- Networking (wired 10GbE) -------------------------------------------
   networking.hostName = "donnager";
-  networking.useDHCP = lib.mkDefault true; # or set a static IP below
-  # networking.interfaces.enp5s0.ipv4.addresses = [{
-  #   address = "192.168.68.230"; prefixLength = 24;
-  # }];
-  # networking.defaultGateway = "192.168.68.1";
-  # networking.nameservers = [ "192.168.68.3" ];    # your AdGuard LXC
+  # Static IP so the AdGuard record donnager.lan -> 192.168.68.128 (used by
+  # the Caddy HTTPS front for Open WebUI on phones) can't rot via DHCP.
+  networking.useDHCP = false;
+  networking.interfaces.enp5s0.ipv4.addresses = [{
+    address = "192.168.68.128"; prefixLength = 24;
+  }];
+  networking.defaultGateway = "192.168.68.1";
+  networking.nameservers = [ "192.168.68.3" ];    # AdGuard LXC
 
   # SSH (keys only, see below) + services used from the LAN:
   # roci (pi) → mcp-nixos:8001, searxng:8888, llama-swap:9292;

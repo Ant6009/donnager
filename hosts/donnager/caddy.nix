@@ -13,10 +13,12 @@
     enable = true;
     openFirewall = true; # opens 80/443/8080/8443
     virtualHosts."donnager.lan" = {
-      extraConfig = "tls internal";
-      locations."/" = {
-        proxyPass = "http://127.0.0.1:3000";
-      };
+      # The `locations`/`proxyPass` options don't exist in nixos-26.05's caddy
+      # module; site-level reverse_proxy covers all paths.
+      extraConfig = ''
+        tls internal
+        reverse_proxy 127.0.0.1:3000
+      '';
     };
   };
 }

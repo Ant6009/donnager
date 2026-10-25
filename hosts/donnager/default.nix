@@ -118,6 +118,65 @@ nixpkgs.overlays = [
       doCheck = false;
     });
   })
+  # nixpkgs bumped python `mcp` to 2.x, which removed mcp.server.fastmcp.
+  # Several packages (fastmcp-slim, posthog, ...) are blanket-marked
+  # `broken = versionAtLeast mcp.version "2"` and our closure pulls in both
+  # (mcp-nixos via fastmcp, open-webui via posthog). Nothing here needs mcp
+  # 2, so pin the whole python set to the 1.x line until the upstream
+  # rework lands (e.g. NixOS/nixpkgs#577109).
+  (final: prev: {
+    python3Packages = prev.python3Packages.overrideScope (finalPy: superPy: {
+      mcp = superPy.mcp_1;
+    });
+  })
+  # nixpkgs' kmod aggregator (used by system.modulesTree) unconditionally
+  # merges modules.cer, which kmodigest generates in newer kernel builds.
+  # Our frozen T2 kernel predates kmodigest and is unsigned (no modules.cer),
+  # so make the merge conditional. Same as upstream aggregator.nix plus a
+  # guard (upstream has no guard for unsigned kernels).
+  (final: prev: {
+    aggregateModules = modules: prev.buildEnv {
+      name = "kernel-modules";
+      paths = modules;
+      pathsToLink = [ "/lib/modules" "/etc/depmod.d" ];
+      postBuild = ''
+        source ${prev.stdenvNoCC}/setup
+
+        if ! test -d "$out/lib/modules"; then
+          echo "No modules found."
+          # To support a kernel without modules
+          exit 0
+        fi
+
+        kernelVersion=$(cd $out/lib/modules && ls -d *)
+        if test "$(echo $kernelVersion | wc -w)" != 1; then
+           echo "inconsistent kernel versions: $kernelVersion"
+           exit 1
+        fi
+
+        echo "kernel version is $kernelVersion"
+
+        shopt -s extglob
+
+        # Regenerate the depmod map files.  Be sure to pass an explicit
+        # kernel version number, otherwise depmod will use `uname -r'.
+        if test -w $out/lib/modules/$kernelVersion; then
+            rm -f $out/lib/modules/$kernelVersion/modules.!(builtin*|order*|cer)
+            ${prev.buildPackages.kmod}/bin/depmod -b $out -C $out/etc/depmod.d -a $kernelVersion
+            cd -- "$out/lib/modules/$kernelVersion"
+
+            # Merge the single-module certificates for external modules.
+            # Guarded: only kmodigest-built kernels have modules.cer.
+            if test -f modules.cer; then
+              cp --no-preserve=mode,ownership --remove-destination \
+                -- "$(readlink -f modules.cer)" modules.cer
+              sed "1,$(wc -l < modules.order)d; s/\\.ko.*/.ko.cer/" modules.dep \
+                  | xargs -d'\\n' cat >> modules.cer
+            fi
+        fi
+      '';
+    };
+  })
 ];
   time.timeZone = "Europe/London";
   system.stateVersion = "25.11"; # match your nixpkgs

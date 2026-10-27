@@ -1,5 +1,9 @@
-{ config, pkgs, lib, ... }:
-let
+{
+  config,
+  pkgs,
+  lib,
+  ...
+}: let
   # froggeric's fixed Qwen chat template, fetched from the canonical HF repo.
   # Pinned to a commit + content hash: reproducible builds, and upgrading is
   # an explicit sha+hash bump (a silent upstream change would fail the hash).
@@ -85,7 +89,7 @@ let
           --spec-draft-p-min 0.8
           -ub 1024
           --cache-reuse 256
-          -np 1
+          -np 3
           -fa on
           -c 262144
           --metrics
@@ -118,7 +122,7 @@ let
           --kv-unified
           --reasoning-preserve
           --temp 1 --min-p 0.0  --top-p 0.95 --top-k 20
-          
+      
         ttl: 900
         aliases: [ "Flash", "3.8 Flash" ]
 
@@ -167,21 +171,20 @@ let
       #embedder:
       #  cmd: ''${llama-server} --model /var/lib/llama/models/embed.gguf --embedding
   '';
-in
-{
+in {
   systemd.services.llama-swap = {
     description = "llama-swap model router";
-    wantedBy = [ "multi-user.target" ];
-    after = [ "network-online.target" ];
-    wants = [ "network-online.target" ];
+    wantedBy = ["multi-user.target"];
+    after = ["network-online.target"];
+    wants = ["network-online.target"];
 
     #environment.AMD_VULKAN_ICD = "RADV";
-    environment.XDG_CACHE_HOME = "/var/cache/llama";   # keeps the shader-cache fix
+    environment.XDG_CACHE_HOME = "/var/cache/llama"; # keeps the shader-cache fix
 
     serviceConfig = {
       User = "llama";
       Group = "llama";
-      SupplementaryGroups = [ "video" "render" ];      # spawned llama-servers inherit this
+      SupplementaryGroups = ["video" "render"]; # spawned llama-servers inherit this
       StateDirectory = "llama";
       CacheDirectory = "llama";
       WorkingDirectory = "/var/lib/llama";
@@ -194,5 +197,5 @@ in
     isSystemUser = true;
     group = "llama";
   };
-  users.groups.llama = { };
+  users.groups.llama = {};
 }

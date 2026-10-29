@@ -19,6 +19,10 @@
     # sanity: how long to wait for a model to come up
     healthCheckTimeout: 300
 
+    # loaded at startup
+    preload:
+      - "Qwen3.8-27b-UD-Q8_K_XL Vision"
+
     macros:
       llama-server: >
         ${pkgs.llama-cpp-cuda}/bin/llama-server
@@ -99,6 +103,35 @@
           --temp 0.8 --top-p 0.95 --top-k 20
         ttl: 900          # unload after 15 min idle, frees VRAM
         aliases: [ "Massive Vision Qwen", "Massive 3.8 Dense Vision" ] 
+      # EGM-dedicated entry (pi-egm agent dir on rocinante): text-only (no
+      # mmproj), high reasoning, sized for elephant + 2 goldfish.
+      # Swaps with the preloaded Vision model - the 64GB card cannot hold
+      # both 30GB copies, so the router's one-model-at-a-time swap is the
+      # exclusivity mechanism. Do not add this to `preload`.
+      Qwen3.8-27b-UD-Q8_K_XL EGM:
+        cmd: |
+          ''${llama-server}
+          --model /var/lib/llama/models/Qwen3.8/Qwen3.8-27B-UD-Q8_K_XL.gguf
+          --chat-template-file ${qwenTemplate} 
+          --device "CUDA0"
+          -t 12
+          --spec-type draft-mtp
+          --spec-draft-n-max 3
+          --spec-draft-p-min 0.8
+          -ub 1024
+          --cache-reuse 1024
+          -np 3
+          -fa on
+          -c 131072
+          --metrics
+          --chat-template-kwargs '{"reasoning_effort":"high"}'
+          --kv-unified
+          --reasoning-preserve
+          --temp 0.8 --top-p 0.95 --top-k 20
+        ttl: 900
+        concurrencyLimit: 3
+        aliases: [ "EGM", "Q8 EGM" ]
+
       Qwen3.8-Flash-UD-Q4_K_XL:
         cmd: |
           ''${llama-server}

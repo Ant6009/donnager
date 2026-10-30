@@ -122,7 +122,7 @@
           --cache-reuse 1024
           -np 3
           -fa on
-          -c 131072
+          -c 262144
           --metrics
           --chat-template-kwargs '{"reasoning_effort":"high"}'
           --kv-unified

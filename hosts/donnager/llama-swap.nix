@@ -124,7 +124,7 @@
           -fa on
           -c 262144
           --metrics
-          --chat-template-kwargs '{"reasoning_effort":"high"}'
+          #--chat-template-kwargs '{"reasoning_effort":"high"}'
           --kv-unified
           --reasoning-preserve
           --temp 0.8 --top-p 0.95 --top-k 20

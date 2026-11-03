@@ -34,6 +34,11 @@ in
         ExecStart = "/var/lib/strata/src/.venv/bin/python /var/lib/strata/src/serve/server.py --engine strata --config /var/lib/strata/src/strata-iq3_xxs.json --port 8081";
 
         Environment = [
+          # The engine binary carries a RUNPATH into the CUDA toolkit's
+          # lib/stubs (a STUB libcuda) — first start died with "CUDA driver
+          # is a stub library". LD_LIBRARY_PATH beats RUNPATH, and the
+          # server prepends lib_dirs to the inherited value, so this wins.
+          "LD_LIBRARY_PATH=/run/opengl-driver/lib"
           # --- Stage 1: bit-exact, PR #3779 set (measured on a CMP 170HX) ---
           "STRATA_GRAPH_PRIO=1"     # decode +1.8 %
           "STRATA_MMVQ_IL_PF=1"     # decode +1.4 %

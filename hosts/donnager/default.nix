@@ -48,16 +48,18 @@
   networking.nameservers = [ "192.168.68.3" ];    # AdGuard LXC
 
   # SSH (keys only, see below) + services used from the LAN:
-  # roci (pi) → mcp-nixos:8001, searxng:8888, llama-swap:9292;
+  # roci (pi) → mcp-nixos:8001, searxng:8888, llama-swap:9292, strata:8081;
   # browser → open-webui:3000. The box sits behind the NAT router
   # (192.168.68.1), so the LAN is the trust boundary; none of these
   # ports are reachable from the internet unless the router forwards
   # them (it doesn't — re-check if that ever changes).
   # (8080 was a leftover from the deleted llama.nix — nothing listens.)
+  # 8081 (strata) is opened for pi on rocinante; Open WebUI reaches it
+  # locally. docs/strata.md §4.4.
   # NixOS's firewall has no per-port source restriction, so per-source
   # lockdown would mean switching to the nftables backend + custom
   # ruleset — not worth it on a NATed single-LAN box.
-  networking.firewall.allowedTCPPorts = [ 22 3000 4242 8001 8888 9292 ];
+  networking.firewall.allowedTCPPorts = [ 22 3000 4242 8001 8888 8081 9292 ];
 
   # ---- Headless / SSH ------------------------------------------------------
   services.openssh = {

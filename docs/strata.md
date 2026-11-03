@@ -3,6 +3,8 @@
 Status: **planning**. Nothing in this doc has been executed yet.
 Research current as of 2026-10-29 against Strata `main` at `46c152a`
 (2026-10-28) and the sm_80 tuning data from issue #3712 / PR #3779.
+Quant: **IQ3_XXS** (decided 2026-11-03); the model pack is local at
+`/var/lib/llama/models/Qwen3.8flash`.
 Companion to `docs/cmp170hx.md` (the card it runs on); assumes that plan's
 stages are done: card installed, unlocked to 64 GB, Gen2 x4 trained.
 
@@ -32,12 +34,14 @@ Model packs come from pinned Hugging Face commits with SHA-256 checks:
 VRAM — ~36 GB at IQ2_XS, ~47 GB at IQ3_XXS — while the PLE table stays
 ~29 GB either way.
 
-Why IQ2_XS on this box: the ~36 GB expert pack fits entirely in the unlocked
-64 GB of HBM2e — near-100% expert hit rate. That is exactly the condition
-under which donnager's weak points (AVX2-only Xeon, Gen2 x4 link) stop
-mattering: steady-state decode and prefill never touch the host link. The
-link only matters for cold model load and conversation KV park/restore
-(§5, PR 4). Q2_0 is the speed fallback if IQ2_XS misbehaves.
+Quant decision (**IQ3_XXS**, 2026-11-03): the ~47 GB expert shard fits
+entirely in the unlocked 64 GB of HBM2e — near-100% expert hit rate, which
+is exactly the condition under which donnager's weak points (AVX2-only
+Xeon, Gen2 x4 link) stop mattering: steady-state decode and prefill never
+touch the host link. The link only matters for cold model load and
+conversation KV park/restore (§5, PR 4). IQ3_XXS also buys the quality
+step up (§7.2: 92.57 vs 89.16 task average). Fallbacks: IQ2_XS if VRAM
+headroom is needed, Q2_0 for raw speed.
 
 The GDN layers matter for the env-var staging below: several of the sm_80
 switches exist specifically for the DeltaNet recurrence.
@@ -88,12 +92,18 @@ not just tidiness.
 
 ### 4.1 Pre-flight
 
-1. **Disk:** ≥ ~70 GB *additional* free on the NVMe — IQ2_XS pack + ~5 GB
-   MTP draft + venv (the nvidia pip wheels are multi-GB) + build
-   artifacts. On top of what is already there, including
-   `/var/lib/llama/models/Qwen3.8flash` (llama-swap's UD-Q4_K_XL, ~80 GB).
+1. **Disk:** the IQ3_XXS pack is local (`/var/lib/llama/models/Qwen3.8flash`),
+   so no ~70 GB model download — budget for venv (the nvidia pip wheels
+   are multi-GB) + build artifacts + the MTP head if not already there.
+   Also `ls` that folder: it must contain the GSQ-RCO IQ3_XXS shards
+   (two: native + PLE) for `--gguf-dir` to work; the unsloth UD-Q4_K_XL
+   4-shard layout there is llama-swap's and its `--gguf-dir` compatibility
+   is unverified (if the folder only has that, drop `--gguf-dir` and let
+   setup.py download).
 2. **VRAM:** `nvidia-smi` → 65536 MiB, name "NVIDIA CMP 170HX" (unlocked).
    A card reporting 8192 MiB voids the resident-experts premise; stop.
+   IQ3_XXS budget: ~47 GB shard + ~1 GB KV @32K + MTP ≈ 51–54 GB — fits,
+   with ~10 GB to spare.
 3. **Link:** `cat /sys/bus/pci/devices/<bdf>/current_link_speed` →
    `5.0 GT/s` (Gen2). If it is Gen1, the slow-link conversation-cache
    switches matter more, not less — note it, don't block on it.
@@ -111,7 +121,8 @@ not just tidiness.
 git clone https://github.com/Niko1221/Strata /var/lib/strata/src
 cd /var/lib/strata/src
 nix develop        # the repo's own flake: CUDA 13.0 + cmake + ninja + python3
-./setup.sh --yes --family qwen --model IQ2_XS --context 32768 --vision no --port 8081
+./setup.sh --yes --family qwen --model IQ3_XXS --context 32768 --vision no --port 8081 \
+           --gguf-dir /var/lib/llama/models/Qwen3.8flash
 ```
 
 What that does (each step is idempotent — re-running only does what is
@@ -119,8 +130,8 @@ missing):
 
 1. venv (uv on NixOS) + Python packages (numpy, jinja2, nvidia CUDA libs)
 2. **compiles the engine for sm_80** (no ready-made build; §3)
-3. downloads the model from its pinned HF revision (resumable, SHA-256
-   checked) + the MTP draft layer
+3. uses the local GGUFs from `--gguf-dir` (skips the HF download; the
+   MTP draft layer is still fetched if missing)
 4. prepares the model for Strata
 5. writes `run-<model>.sh` and starts the server on port 8081
 
@@ -129,13 +140,13 @@ Everything the install writes lands in the checkout itself
 payload the service points at. `--context 32768` keeps the KV cache small
 (the bench's longest prompt is 32K; the model's trained context is 262144).
 
-Note on the existing model: `/var/lib/llama/models/Qwen3.8flash` already
-holds llama-swap's Qwen3.8-Flash-Next (unsloth UD-Q4_K_XL, 4 shards,
-mmproj, MTP). Strata's `setup.py` expects its own pinned GSQ-RCO packs —
-different quant, two-shard native+PLE layout. `--gguf-dir` exists for
-reusing GGUFs, but compatibility with the unsloth layout is unverified.
-Default plan: let setup.py download its own pack under `/var/lib/strata`;
-the llama-swap folder stays untouched, and disk is budgeted for both.
+Note on the model location: `/var/lib/llama/models/Qwen3.8flash` holds
+both llama-swap's Qwen3.8-Flash-Next (unsloth UD-Q4_K_XL, 4 shards,
+mmproj, MTP subfolder) and, per the owner, the IQ3_XXS pack for Strata.
+`--gguf-dir` points at the folder; Strata's `setup.py` expects the
+GSQ-RCO two-shard layout (native + PLE). The folder is read-only for
+this trial — llama-swap keeps using it as before, and nothing here
+writes to it.
 
 After the first successful run: **inspect `run-<model>.sh`** to see exactly
 what it execs (venv python + serve entrypoint, env it sets) — that is the
@@ -186,9 +197,26 @@ let cfg = config.services.strata; in
 
 Plus the import in `hosts/donnager/default.nix`. No new flake inputs
 (the build happens out-of-tree in `/var/lib/strata`; only the service unit
-is Nix-managed), and no firewall change: 8081 stays on 127.0.0.1 and
-Open WebUI (same box, port 3000) gets a second provider at
-`http://127.0.0.1:8081/v1`. llama-swap stays on 9292 untouched.
+is Nix-managed). llama-swap stays on 9292 untouched.
+
+### 4.4 Client-side switching (pi, Open WebUI)
+
+There is no unified router in front of the two backends, so each client
+holds both as named endpoints and switching is one word:
+
+- **pi (rocinante):** `~/.pi/agent/models.json` has both providers
+  (`llama-swap` → `:9292`, `strata` → `:8081`). `~/.local/bin/pi-backend
+  [llama-swap|strata]` sets the default (takes effect in a *new* pi
+  session; the running one keeps its baked-in `PI_PROVIDER`/`PI_MODEL`),
+  or immediately: `pi --provider strata --model qwen3.8-flash-next-iq3_xxs`.
+- **Open WebUI (donnager):** add a second OpenAI provider at
+  `http://127.0.0.1:8081/v1` in the UI; pick the backend per chat.
+- **Pinned model name:** set `model_name` in Strata's generated config to
+  `qwen3.8-flash-next-iq3_xxs` so the
+  client-side id is stable instead of whatever Strata defaults to (the
+  field exists — see Kanorin-chan's `configs/strata-config.example.json`).
+- **Firewall:** 8081 is opened in `default.nix` for pi on rocinante;
+  Open WebUI reaches it locally, so no Caddy involvement.
 
 ## 5. Env-var staging and expected effects
 
@@ -273,7 +301,7 @@ RAM, MTP and vision on.
 | Link | Gen2 **x16**, 6.56 GB/s measured | Gen2 **x4**, ~1/4 of that |
 | Host | i7-9700K, **32 GB** RAM, Ubuntu | Xeon W (AVX2), **96 GB** (71–80 committed) |
 | Strata | v0.1.42, no tuning switches | main `46c152a` + stage-1/2 env |
-| Quant | IQ3_XXS (47 GB shard + 29 GB PLE) | IQ2_XS per runbook (~36 GB experts) |
+| Quant | IQ3_XXS (47 GB shard + 29 GB PLE) | IQ3_XXS (decided 2026-11-03) |
 | Context | 262K–524K, YaRN, KV streamed to RAM | 32K — KV fits in VRAM, no streaming |
 | MTP / vision | on / on | on (setup fetches it) / off |
 
@@ -338,9 +366,9 @@ modified until Strata is up.
    committed of 96).
 4. **Disk** — confirm the NVMe has the ~70 GB *additional* headroom
    (§4.1.1) before the model download starts.
-5. **Quant choice** — IQ2_XS (runbook default, VRAM headroom) vs
-   IQ3_XXS (fits at 32K, +3.4 task-avg per ISTA, §7.2). Decide before
-   the §4.2 download; both go through the same `setup.sh` flag.
+5. **Quant choice** — *resolved 2026-11-03: IQ3_XXS* (fits at 32K,
+   +3.4 task-avg per ISTA, §7.2; IQ2_XS remains the VRAM-headroom
+   fallback).
 6. **Host header / API key** — plain `127.0.0.1:8081` from Open WebUI
    works without a key; if the provider is ever addressed through Caddy
    with a non-localhost Host, set `--api-key` (setup.py flag) — §7.3.

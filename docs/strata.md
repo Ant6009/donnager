@@ -117,13 +117,40 @@ not just tidiness.
 
 ### 4.2 One-time build (on donnager)
 
+First checkout (done 2026-11-03):
+
 ```sh
 git clone https://github.com/Niko1221/Strata /var/lib/strata/src
 cd /var/lib/strata/src
 nix develop        # the repo's own flake: CUDA 13.0 + cmake + ninja + python3
-./setup.sh --yes --family qwen --model IQ3_XXS --context 32768 --vision no --port 8081 \
-           --gguf-dir /var/lib/llama/models/Qwen3.8flash
 ```
+
+Everything after that goes through the pinned wrapper this repo carries at
+`hosts/donnager/files/strata-setup.sh`, installed by the module as
+`/etc/strata/setup.sh`. It spells out every flag, so a rebuild cannot
+silently regenerate a smaller context, a different KV type, a loopback-only
+listen address or a new API key:
+
+```sh
+sudo -u strata /etc/strata/setup.sh            # reuse the built engine
+sudo -u strata /etc/strata/setup.sh --build    # recompile for sm_80 (self-wraps nix develop)
+```
+
+which is, with the flags expanded:
+
+```sh
+./setup.sh --yes --family qwen --model IQ3_XXS --context 262144 --kv int8 \
+           --vision no --mtp on --host 0.0.0.0 --port 8081 \
+           --api-key "$KEY" --gguf-dir /var/lib/llama/models/Qwen3.8flash \
+           --no-browser --no-start
+```
+
+`--api-key` is not in git: the script re-reads the key from the existing
+`strata-iq3_xxs.json`, falls back to `/var/lib/strata/strata-api.key`, and
+only then generates one (printing it once, since pi holds a copy in
+`rocinante:~/.pi/agent/auth.json`). The script fails if setup.py writes a
+context other than 262144, and strips `--open` from the generated
+`run-iq3_xxs.sh` (headless host).
 
 What that does (each step is idempotent — re-running only does what is
 missing):
@@ -137,8 +164,8 @@ missing):
 
 Everything the install writes lands in the checkout itself
 (`setup.py`'s `home()` is the repo root) — so `/var/lib/strata/src` is the
-payload the service points at. `--context 32768` keeps the KV cache small
-(the bench's longest prompt is 32K; the model's trained context is 262144).
+payload the service points at. `--context 262144` is the model's trained
+context (§4.5: measured, it costs ~5 GB of parked KV in RAM, not VRAM).
 
 Note on the model location: `/var/lib/llama/models/Qwen3.8flash` holds
 both llama-swap's Qwen3.8-Flash-Next (unsloth UD-Q4_K_XL, 4 shards,
@@ -197,7 +224,16 @@ let cfg = config.services.strata; in
 
 Plus the import in `hosts/donnager/default.nix`. No new flake inputs
 (the build happens out-of-tree in `/var/lib/strata`; only the service unit
-is Nix-managed). llama-swap stays on 9292 untouched.
+is Nix-managed).
+
+llama-swap is *not* untouched: the two backends cannot share the card, so
+`hosts/donnager/llama-swap.nix` gates its `wantedBy` on `!services.strata.enable`
+and both sides carry `Conflicts=`. With strata enabled, llama-swap is not
+pulled in at boot, and `systemctl start llama-swap` stops strata instead of
+deadlocking the GPU. Everything that expects 9292 (42's `llm.base_url`, Open
+WebUI's first provider, pi's `llama-swap` provider entry) is dark while
+strata runs — switch with `services.strata.enable = false` and a rebuild, or
+`systemctl start llama-swap` for a throwaway test.
 
 ### 4.4 Client-side switching (pi, Open WebUI)
 
@@ -217,6 +253,42 @@ holds both as named endpoints and switching is one word:
   name, so this is belt-and-braces.
 - **Firewall:** 8081 is opened in `default.nix` for pi on rocinante;
   Open WebUI reaches it locally, so no Caddy involvement.
+- **API key:** `--host 0.0.0.0` makes setup.py require one, and the server
+  answers `401 missing or wrong API key` without it (measured). pi keeps its
+  copy in `~/.pi/agent/auth.json` as `{"strata":{"type":"api_key","key":"..."}}`
+  (0600, and it outranks env vars and `models.json` in pi's key resolution
+  order), so plain `pi` works with no `--api-key` flag. The key contains a
+  `>`: quote it on any command line or it silently redirects into a file.
+- **Context numbers must match the server.** pi's `models.json` is sized so
+  `contextWindow + maxTokens` equals the engine's `--max-context` exactly:
+  229376 + 32768 = 262144. The server does not reject a request whose prompt
+  plus `max_tokens` exceeds the context, it starts prefilling and fails late
+  (§4.5).
+
+### 4.5 Context at 256K: measured (2026-11-03)
+
+`--context 262144 --kv int8`, one client, verified with a synthetic prompt:
+
+| Check | Result |
+|---|---|
+| 222,950-token prompt | accepted, HTTP 200, prefill 106 s at 2102 tok/s, decode 78.9 tok/s |
+| VRAM during that prefill | flat at 52558 used / 12353 free over 55 samples |
+| Steady state after | 54158 used / 10753 free of 65536 MiB (~83% occupied) |
+| Engine's own accounting at load | expert cache 39.97 GiB, MTP draft 1100 MiB, prompt-ring borrow 4.00 GiB, graph windows ~140 MiB, "14332 MiB of VRAM free with everything loaded" |
+| Host RAM | strata-host RSS 56.4 GiB of 94 GiB, MemAvailable ~38 GiB |
+
+The 32K to 256K change does not load the card: the engine reserves its arena
+at startup, VRAM does not grow with context length, and the extra cost lands
+in system RAM as parked conversation KV, about 19 KB/token, so a 262K-token
+snapshot is ~5 GB. The conversation cache budget is 8192 MiB for up to 4
+parked conversations and one long conversation already pushes it past that
+(`evictions=4` observed). Eviction is not failure: re-prefill runs at ~2100
+tok/s, so ~2 minutes to rebuild a 250K context.
+
+What is not safe: two heavy clients at once (11 GiB of free VRAM is one long
+conversation), and llama-swap loaded alongside strata, hence the `Conflicts=`
+in §4.3. The engine also runs its own host-RAM guard ("limit 94.2 GiB ... floor
+2560 MiB"), which is why the unit carries no `MemoryMax` (§9.3).
 
 ## 5. Env-var staging and expected effects
 
@@ -363,16 +435,22 @@ modified until Strata is up.
 2. **`ExecStart`** — *resolved after the build*: taken from the generated
    `run-iq3_xxs.sh` (venv python + `serve/server.py` + `strata-iq3_xxs.json`,
    minus `--open`).
-3. **`MemoryMax` value** — per the runbook's RAM guidance (71-80 GB
-   committed of 96).
+3. **`MemoryMax` value** — *resolved 2026-11-03: leave it unset*. A cgroup
+   limit counts the reclaimable page cache holding the mmap'd PLE table and
+   the expert arena, so the runbook's 40 GB guess would OOM-kill a healthy
+   engine (RSS is 56.4 GiB, 26.8 GiB of it that table). The engine's own
+   memory guard (floor 2560 MiB) is doing this job. Revisit only if
+   `LimitMEMLOCK` goes back to its default.
 4. **Disk** — confirm the NVMe has the ~70 GB *additional* headroom
    (§4.1.1) before the model download starts.
 5. **Quant choice** — *resolved 2026-11-03: IQ3_XXS* (fits at 32K,
    +3.4 task-avg per ISTA, §7.2; IQ2_XS remains the VRAM-headroom
    fallback).
-6. **Host header / API key** — plain `127.0.0.1:8081` from Open WebUI
-   works without a key; if the provider is ever addressed through Caddy
-   with a non-localhost Host, set `--api-key` (setup.py flag) — §7.3.
+6. **Host header / API key** — *resolved 2026-11-03: `--host 0.0.0.0` with a
+   key*, pinned through `/etc/strata/setup.sh` (§4.2) and stored client-side
+   in `rocinante:~/.pi/agent/auth.json`. The key stays out of git, and it
+   survives a rebuild because the script re-reads it from the generated
+   config.
 7. **PLE table placement** — after the build: free RAM with the table
    mapped, and page-cache behaviour under the 32K bench (§4.1.4, §6.4).
 8. **Unlock revision on our card** — v0.4 vs v0.5 (+4 SMs) affects

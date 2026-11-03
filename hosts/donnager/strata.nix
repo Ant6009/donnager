@@ -59,15 +59,38 @@ in
           # "STRATA_GDN_TC=1"        # DeltaNet scan: prompts +6.6..7.6 %
         ];
 
+        # The PLE table (26.8 GiB) is mapped but not locked at the default
+        # 8 MiB limit, which the engine itself reports: "the PLE table was
+        # not locked in RAM ... It still works, with the table's pages
+        # faulted in but reclaimable; the lock was measured up to 6% faster
+        # in decode". Locked, it cannot be evicted under memory pressure.
+        LimitMEMLOCK = "infinity";
+
         Restart = "on-failure";
         RestartSec = 5;
 
-        # RAM, not VRAM, is the tight resource (~71-80 GB committed of 96);
-        # parked conversation KV and the ~29 GB PLE table land in system
-        # RAM. Cap the unit so a leak cannot swap the box.
-        # TODO(runbook): final value per the RAM guidance:
-        # MemoryMax = "40G";
+        # RAM, not VRAM, is the tight resource: parked conversation KV and
+        # the 26.8 GiB PLE table land in system RAM. Measured 2026-11-03 at
+        # 256K context: strata-host RSS 56.4 GiB of 94 GiB, MemAvailable
+        # ~38 GiB, and the engine runs its own guard ("memory guard: limit
+        # 94.2 GiB ... floor 2560 MiB").
+        #
+        # No MemoryMax here: a cgroup limit counts the reclaimable page cache
+        # holding the mmap'd PLE table and experts, so the 40 GB the runbook
+        # guessed would OOM-kill a healthy engine. Anything set here has to
+        # clear ~60 GiB. LimitMEMLOCK=infinity makes that worse (locked pages
+        # are not reclaimable), so re-measure before adding one.
       };
+    };
+
+    # The pinned setup command (§4.2) as an executable the rebuild carries:
+    # regenerates strata-iq3_xxs.json with the context/KV/port/host/key this
+    # unit and the clients are sized for.
+    #   sudo -u strata /etc/strata/setup.sh            # reuse the engine
+    #   sudo -u strata /etc/strata/setup.sh --build    # recompile for sm_80
+    environment.etc."strata/setup.sh" = {
+      source = ./files/strata-setup.sh;
+      mode = "0755";
     };
 
     users.users.strata = {

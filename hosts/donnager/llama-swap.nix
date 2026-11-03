@@ -207,7 +207,14 @@
 in {
   systemd.services.llama-swap = {
     description = "llama-swap model router";
-    wantedBy = ["multi-user.target"];
+    # One backend per card. Strata's expert cache takes 39.97 GiB of VRAM at
+    # load and leaves ~11 GiB free (docs/strata.md §4.5), so llama-swap's
+    # ~30 GB preload cannot coexist with it. services.strata.enable is the
+    # single switch: with it on, llama-swap is not pulled in at boot, and
+    # Conflicts= makes a manual `systemctl start llama-swap` stop strata
+    # rather than OOMing the card.
+    wantedBy = lib.mkIf (!(config.services.strata.enable or false)) ["multi-user.target"];
+    conflicts = ["strata.service"];
     after = ["network-online.target"];
     wants = ["network-online.target"];
 

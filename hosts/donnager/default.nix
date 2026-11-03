@@ -11,6 +11,7 @@
     ./openwebui.nix
     ./searx.nix
     ./llama-swap.nix
+    ./strata.nix
     ./t2fanrd.nix
     ./caddy.nix
     ../../modules/git/default.nix

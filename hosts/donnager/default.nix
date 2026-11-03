@@ -20,6 +20,11 @@
   
   nixpkgs.config.allowUnfree = true;  
 
+  # Strata (Qwen3.8-Flash-Next IQ3_XXS) on port 8081. Out-of-tree build in
+  # /var/lib/strata (docs/strata.md); the card can only hold one big model
+  # at a time, so this and llama-swap's preload are mutually exclusive.
+  services.strata.enable = true;
+
   # ---- Boot ----------------------------------------------------------------
   boot.loader.systemd-boot.enable = true;
   # /boot is a tiny 300M partition: cap boot entries so old initrds (76M each)

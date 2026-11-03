@@ -211,10 +211,10 @@ holds both as named endpoints and switching is one word:
   or immediately: `pi --provider strata --model qwen3.8-flash-next-iq3_xxs`.
 - **Open WebUI (donnager):** add a second OpenAI provider at
   `http://127.0.0.1:8081/v1` in the UI; pick the backend per chat.
-- **Pinned model name:** set `model_name` in Strata's generated config to
-  `qwen3.8-flash-next-iq3_xxs` so the
-  client-side id is stable instead of whatever Strata defaults to (the
-  field exists — see Kanorin-chan's `configs/strata-config.example.json`).
+- **Model name:** the generated config already carries
+  `model_name: qwen3.8-flash-next-iq3_xxs` (verified after the build) —
+  matches the client id, nothing to pin. The API also accepts any model
+  name, so this is belt-and-braces.
 - **Firewall:** 8081 is opened in `default.nix` for pi on rocinante;
   Open WebUI reaches it locally, so no Caddy involvement.
 
@@ -360,8 +360,9 @@ modified until Strata is up.
    (`STRATA_PLE_COMPACT`, `STRATA_PLE_COPY_STREAM`, `STRATA_EMBED_VRAM`,
    `STRATA_DEQUANT_SIDE`) are in stage 1 or 2 here. `hosts/donnager/strata.nix`
    is filled from issue #3712 data and needs this.
-2. **`ExecStart`** — read the generated `run-<model>.sh` after the §4.2
-   build; the module's placeholder must be replaced before enabling.
+2. **`ExecStart`** — *resolved after the build*: taken from the generated
+   `run-iq3_xxs.sh` (venv python + `serve/server.py` + `strata-iq3_xxs.json`,
+   minus `--open`).
 3. **`MemoryMax` value** — per the runbook's RAM guidance (71-80 GB
    committed of 96).
 4. **Disk** — confirm the NVMe has the ~70 GB *additional* headroom

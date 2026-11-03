@@ -28,10 +28,10 @@ in
         SupplementaryGroups = [ "video" "render" ];
         WorkingDirectory = "/var/lib/strata/src";
 
-        # TODO(verify after the docs/strata.md §4.2 build): read the
-        # generated run-<model>.sh and point this at what it execs
-        # (venv python + serve entrypoint, plus any env it sets).
-        ExecStart = "/var/lib/strata/src/.venv/bin/python /* serve entrypoint — TODO */";
+        # From the generated run-iq3_xxs.sh (minus --open, which pops a
+        # browser — headless here). The config carries the engine args,
+        # model paths, MTP, port and lib_dirs (CUDA 13.0 from the store).
+        ExecStart = "/var/lib/strata/src/.venv/bin/python /var/lib/strata/src/serve/server.py --engine strata --config /var/lib/strata/src/strata-iq3_xxs.json --port 8081";
 
         Environment = [
           # --- Stage 1: bit-exact, PR #3779 set (measured on a CMP 170HX) ---

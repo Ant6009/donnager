@@ -8,6 +8,7 @@
     ../../hardware-configuration.nix
     ./gpu.nix
     ./nvidia.nix
+    ./open-terminal.nix
     ./openwebui.nix
     ./searx.nix
     ./llama-swap.nix

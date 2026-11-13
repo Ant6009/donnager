@@ -31,6 +31,13 @@
       url = "github:Ant6009/42";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    # Pinned second nixpkgs, for fast-moving LLM tooling only: open-terminal
+    # now, and open-webui / llama-cpp-cuda later if you want a newer one
+    # without a userspace bump of the main input. Update it on its own with
+    #   nix flake update llmNixpkgs
+    # so `nixpkgs` (and the frozen kernel input) never move as a side effect.
+    llmNixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   };
 
   # Binary cache so you DON'T recompile the T2-patched kernel (saves ~1h+).
@@ -41,9 +48,17 @@
     ];
   };
 
-  outputs = { self, nixpkgs, nixpkgs-frozen, nixos-hardware, t2fanrd, agenix, fortytwo, ... }:
+  outputs = { self, nixpkgs, nixpkgs-frozen, nixos-hardware, t2fanrd, agenix, fortytwo, llmNixpkgs, ... }:
   let
     system = "x86_64-linux";
+
+    # open-terminal does not exist in the locked main nixpkgs (2026-10-23), so
+    # the LLM-tooling packages come from `llmNixpkgs`. Modules receive this
+    # instantiated set as `llmPkgs` (see hosts/donnager/open-terminal.nix).
+    llmPkgs = import llmNixpkgs {
+      inherit system;
+      config.allowUnfree = true;
+    };
 
     # Build the T2 kernel AND all of its modules from the frozen nixpkgs so
     # the kernel stays at 6.18.44 no matter how far `nixpkgs` (userspace)
@@ -62,6 +77,7 @@
   {
     nixosConfigurations.donnager = nixpkgs.lib.nixosSystem {
       inherit system;
+      specialArgs = { inherit llmPkgs; };
       modules = [
         nixos-hardware.nixosModules.apple-t2 # all the T2 magic
         t2fanrd.nixosModules.t2fanrd

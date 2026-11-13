@@ -18,4 +18,12 @@ in
   # Consumed via services.searx.environmentFile + $SEARX_SECRET_KEY (envsubst).
   # NOTE: key must match the FILE argument exactly (invoke from repo root).
   "secrets/searxng.age".publicKeys = [ donnager ];
+
+  # Raw bearer key for the Open Terminal API (64 hex chars, no NAME= prefix):
+  # open-terminal reads the whole file contents via OPEN_TERMINAL_API_KEY_FILE.
+  # Regenerate (opens $EDITOR; paste the new key, save, quit):
+  #   RULES=./secrets/secrets.nix nix run github:ryantm/agenix -- -e secrets/open-terminal.age
+  # Read the current value (on donnager, to paste into Open WebUI):
+  #   sudo nix run github:ryantm/agenix -- -d secrets/open-terminal.age
+  "secrets/open-terminal.age".publicKeys = [ donnager ];
 }

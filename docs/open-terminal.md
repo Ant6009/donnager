@@ -88,8 +88,9 @@ a tool, the problem is the model/template, not the terminal.
   llama-server, fill `/var`). Treat the key like a password.
 - `--host 127.0.0.1` is explicit in `ExecStart`: without it open-terminal binds
   `0.0.0.0`.
-- `PrivateDevices` is deliberately not set, so `nvidia-smi` works inside a
-  terminal. Anything the agent starts on a port stays unreachable from the LAN
+- `PrivateDevices` is deliberately not set, and the unit PATH starts with
+  `config.hardware.nvidia.package.bin`, so `nvidia-smi` works inside a terminal.
+  Anything the agent starts on a port stays unreachable from the LAN
   (the firewall allows only 22 3000 4242 8001 8888 8081 9292).
 - Access control per Open WebUI user/group lives on the connection row.
 - Multi-user mode stays off (`OPEN_TERMINAL_MULTI_USER` unset): all users of

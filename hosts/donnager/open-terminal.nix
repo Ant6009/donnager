@@ -56,30 +56,36 @@
       # environment.systemPackages: the service gets its own PATH.
       # mkForce because the systemd module seeds a default PATH for every
       # unit (coreutils/findutils/gnugrep/gnused/systemd).
-      PATH = lib.mkForce (lib.makeBinPath (with pkgs; [
-        bash
-        coreutils
-        gnugrep
-        gnused
-        gawk
-        gnutar
-        gzip
-        bzip2
-        xz
-        findutils
-        diffutils
-        which
-        procps
-        util-linux
-        ripgrep
-        fd
-        jq
-        curl
-        git
-        python3
-        nodejs
-        nano
-      ]));
+      PATH = lib.mkForce (lib.makeBinPath (
+        # nvidia-smi comes from the pinned driver package, not from pkgs:
+        # hosts/donnager/nvidia.nix sets hardware.nvidia.package (mkDriver
+        # 610.57.04) and puts `.bin` in systemPackages for the same reason.
+        # PrivateDevices is off, so the agent can actually query the card.
+        [ config.hardware.nvidia.package.bin ]
+        ++ (with pkgs; [
+          bash
+          coreutils
+          gnugrep
+          gnused
+          gawk
+          gnutar
+          gzip
+          bzip2
+          xz
+          findutils
+          diffutils
+          which
+          procps
+          util-linux
+          ripgrep
+          fd
+          jq
+          curl
+          git
+          python3
+          nodejs
+          nano
+        ])));
 
       OPEN_TERMINAL_API_KEY_FILE = config.age.secrets."open-terminal".path;
       OPEN_TERMINAL_FILE_BROWSER_ROOT = "home"; # file browser stays under HOME

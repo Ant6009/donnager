@@ -111,13 +111,11 @@
     htop
     btop
     tmux
-    vulkan-tools # vulkaninfo
-    radeontop # GPU load/VRAM monitor
     pciutils
     lm_sensors
     python313Packages.huggingface-hub
     mcp-nixos
-    nvtopPackages.full
+    nvtopPackages.nvidia # nvidia-smi TUI (the Vega II is gone from the config)
   ];
 
 nixpkgs.overlays = [

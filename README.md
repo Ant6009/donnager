@@ -5,8 +5,9 @@ local LLM inference server.
 
 ## Hardware
 
-- Mac Pro 7,1 (2019), T2 chip — T2-patched kernel via `nixos-hardware` `apple-t2`
-- AMD Radeon Pro Vega II (Vulkan/RADV compute for llama.cpp)
+- Mac Pro 7,1 (2019), T2 chip — T2-patched kernel 6.18.44 via `nixos-hardware` `apple-t2`
+- NVIDIA CMP 170HX 64 GB — the inference card. Driver pinned at 610.57.04 with the cmpunlocker patches (`hosts/donnager/nvidia.nix`, docs/cmp170hx.md); llama-server runs `--device CUDA0`, strata is a CUDA build
+- AMD Radeon Pro Vega II — used by nothing. `hosts/donnager/gpu.nix` no longer configures AMD/RADV and mesa is out of the closure; the card is being sold
 - Wired 10GbE, behind a NAT router (the LAN is the trust boundary)
 
 ## Services
@@ -17,24 +18,29 @@ local LLM inference server.
 | open-webui | 3000 | browser UI, password auth, web search via searxng            |
 | mcp-nixos  | 8001 | NixOS MCP server (HTTP), for pi on the LAN                  |
 | searxng    | 8888 | private metasearch; secret key via agenix, limiter off       |
-| llama-swap | 9292 | model router for `llama-server` (Vulkan); OpenAI-compatible  |
+| llama-swap | 9292 | model router for `llama-server` (CUDA); OpenAI-compatible    |
+| strata     | 8081 | second inference server, out-of-tree build (docs/strata.md)  |
+| open-terminal | 8000 | agent computer for Open WebUI; 127.0.0.1 only, no open port |
 
 Models live in `/var/lib/llama/models/` (not in git — see `.gitignore`).
 llama-swap unloads models after 15 min idle to free VRAM; each model pins its
 own context size / quantization / chat template (Qwen uses the pinned
 froggeric fixed chat template, fetched by hash).
 
-Fans are driven by [t2fanrd](https://github.com/GnomedDev/T2FanRD) (the Vega II
-is passively cooled; T2 case fans are the only cooling).
+Fans are driven by [t2fanrd](https://github.com/GnomedDev/T2FanRD) (the T2 case
+fans are the only cooling, and Fan1 is the rear GPU exhaust — re-check the
+profile once the passively cooled Vega II is physically gone).
 
 ## Repository layout
 
 ```
-flake.nix                     flake entrypoint (nixos-unstable + apple-t2 + t2fanrd + agenix)
+flake.nix                     flake entrypoint (nixos-unstable + nixpkgs-frozen for the
+                              kernel + apple-t2 + t2fanrd + agenix + llmNixpkgs)
 hardware-configuration.nix    disk layout (nixos-generate-config)
 hosts/donnager/               host config: services, GPU, fans, firewall
 modules/git/                  shared /etc/gitconfig defaults (identity set per-user)
 modules/mcp-servers/          generic module: run MCP servers as hardened systemd services
+docs/                         per-service notes (cmp170hx, strata, open-terminal, phone audio)
 secrets/                      age-encrypted secrets (public keys only; blobs decrypt
                               at activation with the machine's SSH host key)
 ```
@@ -49,6 +55,20 @@ The flake uses the `cache.soopy.moe` binary cache for the T2-patched kernel
 (saves ~1h+ of compilation). `/boot` is a 300M partition, so systemd-boot is
 capped at 5 entries — old generations are pruned automatically.
 
+### Updating pins
+
+Never a bare `nix flake update`: it also moves `nixpkgs-frozen`, which pins the
+T2 kernel (6.18.44 is the last 6.18.y the t2linux patches apply to). Named
+updates only, each as its own commit:
+
+```sh
+nix flake update llmNixpkgs   # open-terminal today; open-webui / llama-cpp-cuda later
+nix flake update nixpkgs      # full userspace bump: llama-cpp, mesa, python, open-webui
+```
+
+Unfree packages (open-webui, the NVIDIA driver) are not in cache.nixos.org, so
+expect a local build of those after a bump.
+
 ## Secrets (agenix)
 
 Secrets are age-encrypted in `secrets/*.age` and committed; they decrypt at
@@ -58,4 +78,7 @@ The public keys in `secrets/secrets.nix` are safe to share.
 ```sh
 # add a new secret
 RULES=./secrets/secrets.nix nix run github:ryantm/agenix -- -e secrets/<name>.age
+
+# read one back (on donnager)
+sudo nix run github:ryantm/agenix -- -d secrets/<name>.age
 ```

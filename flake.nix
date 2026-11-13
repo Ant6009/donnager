@@ -2,15 +2,22 @@
   description = "Mac Pro 7,1 headless LLM inference server";
 
   inputs = {
-    # Rolling userspace: freshest Mesa/RADV (25.3+ has real RADV compute
-    # gains) and current llama.cpp.
+    # Userspace: llama.cpp/llama-swap, open-webui, searxng, caddy. The old
+    # justification (freshest Mesa/RADV for llama.cpp compute) no longer
+    # applies: inference is CUDA-only on the CMP 170HX and mesa is out of the
+    # closure (hosts/donnager/gpu.nix). Bump it deliberately, on its own, as
+    # its own commit — `nix flake update nixpkgs`. Fast-moving LLM tooling
+    # should come from `llmNixpkgs` instead so this input can stay put.
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
     # FROZEN kernel source. The T2 kernel is built from nixpkgs' linux_6_18,
     # and the t2linux patches (pinned in nixos-hardware) only apply up to a
     # given 6.18.y. 0ae2bc14 -> linux_6_18 = 6.18.44, the last known-good.
     # Bump this input ONLY after verifying the new 6.18.y kernel still builds;
-    # never run bare `nix flake update` (it would move this too).
+    # never run bare `nix flake update` (it would move this too). What a bare
+    # update drags along: this kernel, `nixpkgs` userspace (llama-cpp, mesa,
+    # open-webui, python, nix), and the cargo builds of t2fanrd/fortytwo, whose
+    # nixpkgs `follows = "nixpkgs"`.
     nixpkgs-frozen.url = "github:NixOS/nixpkgs/0ae2bc1419c3f345984c2629e72e7a631820fa4d";
 
     nixos-hardware.url = "github:NixOS/nixos-hardware/master";

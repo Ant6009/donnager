@@ -140,10 +140,48 @@ which is, with the flags expanded:
 
 ```sh
 ./setup.sh --yes --family qwen --model IQ3_XXS --context 262144 --kv int8 \
-           --vision no --mtp on --host 0.0.0.0 --port 8081 \
+           --vision gpu --mtp on --host 0.0.0.0 --port 8081 \
            --api-key "$KEY" --gguf-dir /var/lib/llama/models/Qwen3.8flash \
            --no-browser --no-start
 ```
+
+Pictures need two things the pinned script cannot fetch on this box, and both
+are checked before setup runs:
+
+1. **The picture reader is a second binary** (`engine/strata-vision`, llama.cpp's
+   `mtmd`). The 2026-11-03 build compiled the engine with `--vision no`, so
+   `engine/BUILD.json` says `"vision": "none"` and there is no reader beside
+   it. `--vision gpu` without `--build` only prints *"this engine has no image
+   encoder: images off (run setup again with --build to compile it)"* and stays
+   text-only. With `--build`, the engine's own source hash is unchanged, so
+   only `tools/vision` compiles for sm_80 (10-20 minutes, once) and
+   `BUILD.json` is re-stamped `"vision": "gpu"`.
+2. **With `--gguf-dir`, setup downloads nothing.** It wants the pinned mmproj in
+   that folder under its pinned name, and fails with *"put
+   mmproj-Qwen3.8-Flash-Next-BF16.gguf in ... or drop --gguf-dir to download
+   it"* otherwise. The pinned file is 907,543,008 bytes, sha256
+   `b1a82259702816a5330d7bd7607cd9676b11780e79ff7348c21103ff3ce49bd0`, from
+   [ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF](https://huggingface.co/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF)
+   at the revision setup.py pins (`ed59f920…`). The folder is root-owned, so:
+
+   ```sh
+   sudo curl -L -o /var/lib/llama/models/Qwen3.8flash/mmproj-Qwen3.8-Flash-Next-BF16.gguf \
+     https://huggingface.co/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF/resolve/ed59f92082b1e93c0e96d60a8b11aab089b52f09/mmproj-Qwen3.8-Flash-Next-BF16.gguf
+   ```
+
+   Unsloth's `mmproj-F16.gguf` already in that folder (904,004,000 bytes, the
+   llama-swap entries' projector) is a different file: renaming it to the
+   pinned name fails the size check, and setup never deletes a file you put in
+   the folder yourself.
+
+What setup then writes is config-only: `--vision` in `args` plus a `"vision"`
+section (`exe`, `mmproj`, `model`, `gpu: true`, `max_tokens: 1024`). The engine
+binary already knows the `--vision` flag. Step 6 rebuilds the tokenizer only
+when `packs/iq3_xxs/tokenizer/vocab.json` is missing, so the pack is not
+reconverted. The GPU reader keeps ~1.4 GiB of VRAM and setup reserves 700 MiB
+(`--vram-reserve-mib 700`) out of the expert cache, against the ~10.7 GiB free
+at load (§4.5). `--vision cpu` is the no-VRAM fallback: 300 image tokens per
+picture, 3-30 s each, and it still needs `--build` for the same binary.
 
 `--api-key` is not in git: the script re-reads the key from the existing
 `strata-iq3_xxs.json`, falls back to `/var/lib/strata/strata-api.key`, and
@@ -158,7 +196,8 @@ missing):
 1. venv (uv on NixOS) + Python packages (numpy, jinja2, nvidia CUDA libs)
 2. **compiles the engine for sm_80** (no ready-made build; §3)
 3. uses the local GGUFs from `--gguf-dir` (skips the HF download; the
-   MTP draft layer is still fetched if missing)
+   MTP draft layer is still fetched if missing, and the picture reader must
+   already be in the folder — see the mmproj note above)
 4. prepares the model for Strata
 5. writes `run-<model>.sh` and starts the server on port 8081
 
@@ -375,7 +414,7 @@ RAM, MTP and vision on.
 | Strata | v0.1.42, no tuning switches | main `46c152a` + stage-1/2 env |
 | Quant | IQ3_XXS (47 GB shard + 29 GB PLE) | IQ3_XXS (decided 2026-11-03) |
 | Context | 262K–524K, YaRN, KV streamed to RAM | 32K — KV fits in VRAM, no streaming |
-| MTP / vision | on / on | on (setup fetches it) / off |
+| MTP / vision | on / on | on (setup fetches it) / gpu reader (§4.2) |
 
 His measured numbers (IQ3_XXS, single card): prefill 2,456 t/s @112–135K
 falling to 1,488 @852K; decode 97 t/s @112–135K, ~145 t/s short-chat
@@ -456,6 +495,14 @@ modified until Strata is up.
 8. **Unlock revision on our card** — v0.4 vs v0.5 (+4 SMs) affects
    comparability with both references (§7.8); `docs/cmp170hx.md` records
    it.
+9. **Pictures** — the pinned script asks for `--vision gpu` (§4.2). Open:
+   compile `engine/strata-vision` with `sudo -u strata /etc/strata/setup.sh
+   --build --vision gpu`, re-measure `nvidia-smi` after the reader starts
+   (expect ~1.4 GiB used + 700 MiB reserved out of the 10.7 GiB free at load,
+   §4.5), then declare the input on the client: pi's `models.json` strata model
+   needs `"input": ["text", "image"]` (and a resize cap near 1568×1568, since
+   `vision.max_tokens` clamps each picture at 1024 image tokens) before pi
+   sends one at all.
 
 ## 10. Sources
 

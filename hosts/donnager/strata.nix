@@ -31,6 +31,12 @@ in
         # From the generated run-iq3_xxs.sh (minus --open, which pops a
         # browser — headless here). The config carries the engine args,
         # model paths, MTP, port and lib_dirs (CUDA 13.0 from the store).
+        #
+        # Pictures are config-driven, not unit-driven: setup.sh writes --vision
+        # plus a "vision" section into strata-iq3_xxs.json (docs/strata.md §4.2),
+        # and the server starts engine/strata-vision from it. The GPU reader
+        # keeps ~1.4 GiB on the card and setup reserves 700 MiB of the expert
+        # cache for it.
         ExecStart = "/var/lib/strata/src/.venv/bin/python /var/lib/strata/src/serve/server.py --engine strata --config /var/lib/strata/src/strata-iq3_xxs.json --port 8081";
 
         Environment = [

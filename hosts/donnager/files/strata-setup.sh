@@ -2,7 +2,8 @@
 # Pinned Strata setup for donnager (CMP 170HX, 64 GiB). This is docs/strata.md
 # §4.2's command with every flag spelled out, so a rebuild regenerates the
 # same service the NixOS unit expects: 256K context, int8 KV, port 8081,
-# LAN listen, the same API key, local GGUFs, no browser, no auto-start.
+# LAN listen, the same API key, local GGUFs, pictures on the GPU, no browser,
+# no auto-start.
 #
 # Nix installs this at /etc/strata/setup.sh (see hosts/donnager/strata.nix).
 # Run it as the strata user, since the checkout and everything it writes is
@@ -33,6 +34,38 @@ PORT=8081
 HOST=0.0.0.0     # reachable from rocinante (8081 is opened in default.nix)
 
 cd "$SRC"
+
+# Pictures need two things setup.py will not fetch for us on this box.
+#
+# 1. The picture reader is a second binary (engine/strata-vision, llama.cpp's
+#    mtmd). Without it setup prints "this engine has no image encoder: images
+#    off" and quietly stays text-only, so --vision gpu needs --build. Since
+#    the engine's own source is unchanged, only tools/vision compiles (10-20
+#    minutes, once).
+# 2. With --gguf-dir, setup downloads nothing: it wants the pinned mmproj in
+#    that folder under its pinned name. The folder is root-owned, so it goes
+#    in by hand (docs/strata.md §4.2). Unsloth's mmproj-F16.gguf beside the
+#    llama-swap shards is a different file (904,004,000 bytes); renaming it
+#    fails the size check.
+MMPROJ=mmproj-Qwen3.8-Flash-Next-BF16.gguf
+MMPROJ_URL=https://huggingface.co/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF/resolve/ed59f92082b1e93c0e96d60a8b11aab089b52f09/$MMPROJ
+case " $* " in
+  *" --vision no "*|*" --vision none "*|*" --vision off "*) ;;   # images asked off
+  *)
+    if [ ! -e "$SRC/engine/strata-vision" ]; then
+      case " $* " in
+        *" --build "*) ;;
+        *) echo "note: engine/strata-vision is missing; without --build setup turns images off" ;;
+      esac
+    fi
+    if [ ! -f "$GGUF_DIR/$MMPROJ" ]; then
+      echo "$MMPROJ is missing from $GGUF_DIR (--gguf-dir means no download):"
+      echo "  sudo curl -L -o $GGUF_DIR/$MMPROJ $MMPROJ_URL"
+      echo "  907,543,008 bytes, sha256 b1a82259702816a5330d7bd7607cd9676b11780e79ff7348c21103ff3ce49bd0"
+      exit 1
+    fi
+    ;;
+esac
 
 # --build: compile the engine for sm_80 instead of taking the prebuilt one.
 # That needs the repo's own dev shell (CUDA 13.0, cmake, ninja, python); pull
@@ -66,7 +99,7 @@ fi
 ./setup.sh --yes \
   --family qwen --model IQ3_XXS \
   --context "$CONTEXT" --kv "$KV" \
-  --vision no --mtp on \
+  --vision gpu --mtp on \
   --host "$HOST" --port "$PORT" \
   --api-key "$KEY" \
   --gguf-dir "$GGUF_DIR" \
@@ -93,9 +126,11 @@ fi
 
 cat <<'EOF'
 next steps
+  ls -l /var/lib/strata/src/engine/strata-vision   # the picture reader (--build built it)
+  grep -E -- '"--vision"|"vision"' /var/lib/strata/src/strata-iq3_xxs.json
   sudo systemctl stop llama-swap        # one backend per card: strata fills the VRAM
   sudo systemctl restart strata
-  nvidia-smi --query-gpu=memory.used,memory.free --format=csv
+  nvidia-smi --query-gpu=memory.used,memory.free --format=csv   # the GPU reader keeps ~1.4 GiB + 700 MiB of reserve
   systemctl show strata -p LimitMEMLOCK # infinity: the 26.8 GiB PLE table stays locked
   journalctl -u strata -b | grep 'VRAM free'
 EOF

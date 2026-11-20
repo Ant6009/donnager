@@ -82,13 +82,14 @@ let
           mode = "0755";
         };
 
-        # (The build shell is not installed here: the setup script clones this
-        # repo into /home/maya/flake for its own `nix develop`, because nix's
-        # flake fetcher refuses a git repository it does not own and /etc/nixos
-        # is antoine's. An attempt to hand out flake.nix via environment.etc is
-        # what measured that - every form of it, .source and .text, lands as a
-        # symlink into /etc/static, which is dangling inside the store copy nix
-        # makes of any flake directory.)
+        # (The build shell is not installed here: the setup script copies this
+        # repo's flake.nix and flake.lock into /home/maya/flake for its own
+        # `nix develop`. Neither tool can use /etc/nixos as the maya user - nix's
+        # flake fetcher refuses a git repository it does not own and git calls it
+        # "dubious ownership" - and handing the flake over as an environment.etc
+        # entry is worse still: both .source and .text land as a symlink into
+        # /etc/static, which is dangling inside the store copy nix makes of a
+        # flake directory. Measured 2026-11-20.)
       };
     };
 

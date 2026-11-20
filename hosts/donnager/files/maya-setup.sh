@@ -10,11 +10,13 @@
 #
 #   sudo -u maya /etc/maya/setup.sh
 #
-# It pulls the build shell from a maya-owned clone of this repo at
-# /home/maya/flake whenever it is not already inside one. It cannot take it from
-# /etc/nixos as the maya user: nix refuses to open a git repository it does not
-# own, and a flake cannot be handed out as a symlink (/etc/maya/flake landed as a
-# dangling symlink inside the store copy nix makes of a flake directory).
+# It pulls the build shell from a copy of flake.nix + flake.lock in $HOME_DIR/flake
+# whenever it is not already inside one. Neither way of reaching /etc/nixos as the
+# maya user works: nix's flake fetcher refuses a git repository it does not own
+# ("repository path '/etc/nixos' is not owned by current user"), and git itself
+# refuses it too ("detected dubious ownership in repository at '/etc/nixos/.git'").
+# Two copied files are enough - devShells.maya only uses the locked nixpkgs input -
+# and a directory is a path flake, so nothing has to be owned.
 #
 # ~254 GB of downloads, from Hugging Face, into /home/maya/models. The build
 # itself is 20-40 minutes. Nothing here is automatic: read what it prints.
@@ -29,7 +31,7 @@ MODELS=$HOME_DIR/models
 PORT=8080
 HOST=0.0.0.0                     # reachable from rocinante; 8080 is opened in default.nix
 KEY_FILE=$HOME_DIR/maya-api.key  # never in git; the key order below reuses it
-FLAKE_LOCAL=$HOME_DIR/flake      # maya-owned clone of $FLAKE, for its devShell only
+FLAKE_LOCAL=$HOME_DIR/flake      # copies of $FLAKE's flake.nix + flake.lock, for its devShell only
 HY4_MODEL=hy4-flash-maya-m       # Maya's own 3-bit quant: 76 GiB held in RAM+VRAM
 QWEN_MODEL=cyber-frost           # peasantsmith's Q5_K/IQ4_NL GGUF: 84 GiB held
 CONTEXT=""                       # empty: Maya picks the context that fits the card
@@ -43,14 +45,14 @@ in_build_shell() {
   [ -n "${IN_NIX_SHELL:-}" ] && command -v nvcc >/dev/null 2>&1
 }
 
-# A local clone, owned by whoever runs this: nix's flake fetcher refuses a git
-# repository it does not own, so /etc/nixos is unusable as the maya user
-# ("repository path '/etc/nixos' is not owned by current user", libgit2 error 7).
-# The clone carries the same flake.lock, so the shell is the pinned one.
+# Two copied files, owned by whoever runs this: nix's flake fetcher and git both
+# refuse /etc/nixos when it belongs to somebody else, and devShells.maya needs
+# nothing but the pinned flake.lock.
 if ! in_build_shell; then
-  if [ ! -d "$FLAKE_LOCAL/.git" ]; then
-    echo "cloning $FLAKE -> $FLAKE_LOCAL (for its devShell only)"
-    git clone "$FLAKE" "$FLAKE_LOCAL"
+  if [ ! -f "$FLAKE_LOCAL/flake.nix" ]; then
+    mkdir -p "$FLAKE_LOCAL"
+    echo "copying $FLAKE/flake.nix + flake.lock -> $FLAKE_LOCAL (for its devShell only)"
+    cp "$FLAKE/flake.nix" "$FLAKE/flake.lock" "$FLAKE_LOCAL/"
   fi
   echo "entering $FLAKE_LOCAL#maya (nvcc + gcc 13 + cmake + ninja + python)"
   exec nix develop "$FLAKE_LOCAL#maya" -c "$0" "$@"

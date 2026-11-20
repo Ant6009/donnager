@@ -117,8 +117,13 @@
         # separately. src/core/glm_fast_path.cu includes cuda_profiler_api.h, so
         # the Qwen-family engine (strata_engine) stopped at "fatal error:
         # cuda_profiler_api.h: No such file or directory" while the Hy4 engine
-        # built fine - its sources do not include that header.
+        # built fine - its sources do not include that header. nvtx3/nvToolsExt.h
+        # (same file, line 49) is cuda_nvtx, and stopped it again one compile
+        # later. The whole CUDA include set Maya's sources ask for, measured:
+        # cuda.h, cuda_runtime.h, cuda_fp16.h, cuda_bf16.h, cuda_fp8.h (nvcc +
+        # cudart), cublas_v2.h (libcublas), cuda_profiler_api.h, nvToolsExt.h.
         llmPkgs.cudaPackages.cuda_profiler_api
+        llmPkgs.cudaPackages.cuda_nvtx
         llmPkgs.gcc13
         llmPkgs.cmake
         llmPkgs.ninja

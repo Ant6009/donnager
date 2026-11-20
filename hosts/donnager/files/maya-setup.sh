@@ -55,13 +55,12 @@ in_build_shell() {
 
 # Two copied files, owned by whoever runs this: nix's flake fetcher and git both
 # refuse /etc/nixos when it belongs to somebody else, and devShells.maya needs
-# nothing but the pinned flake.lock.
+# nothing but the pinned flake.lock. Copied every run, not only when missing: a
+# stale copy here would keep an old devShell (that is how a flake.nix fix would
+# silently not reach the build).
 if ! in_build_shell; then
-  if [ ! -f "$FLAKE_LOCAL/flake.nix" ]; then
-    mkdir -p "$FLAKE_LOCAL"
-    echo "copying $FLAKE/flake.nix + flake.lock -> $FLAKE_LOCAL (for its devShell only)"
-    cp "$FLAKE/flake.nix" "$FLAKE/flake.lock" "$FLAKE_LOCAL/"
-  fi
+  mkdir -p "$FLAKE_LOCAL"
+  cp "$FLAKE/flake.nix" "$FLAKE/flake.lock" "$FLAKE_LOCAL/"
   echo "entering $FLAKE_LOCAL#maya (nvcc + gcc 13 + cmake + ninja + python)"
   exec nix develop "$FLAKE_LOCAL#maya" -c "$0" "$@"
 fi

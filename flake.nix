@@ -103,7 +103,7 @@
     # only probes the default g++ plus /usr/bin/g++-N (maya.py toolchain_for),
     # so gcc13 goes first on PATH and as CC/CXX.
     #
-    # Build shell only: Maya's engine, .venv and ~254 GB of models live
+    # Build shell only: Maya's engine, .venv and ~245 GB of models live
     # out-of-tree in /home/maya (hosts/donnager/maya.nix), the same way strata
     # lives in /var/lib/strata. cudaPackages repackages NVIDIA's own tarballs,
     # so this is a multi-GB download, not a compile.
@@ -113,6 +113,12 @@
         llmPkgs.cudaPackages.cuda_nvcc
         llmPkgs.cudaPackages.cuda_cudart
         llmPkgs.cudaPackages.libcublas
+        # CUDA 13 splits the profiler API out of cudart and nixpkgs packages it
+        # separately. src/core/glm_fast_path.cu includes cuda_profiler_api.h, so
+        # the Qwen-family engine (strata_engine) stopped at "fatal error:
+        # cuda_profiler_api.h: No such file or directory" while the Hy4 engine
+        # built fine - its sources do not include that header.
+        llmPkgs.cudaPackages.cuda_profiler_api
         llmPkgs.gcc13
         llmPkgs.cmake
         llmPkgs.ninja

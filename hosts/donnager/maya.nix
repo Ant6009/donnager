@@ -89,12 +89,14 @@ let
         # current user". flake.nix and flake.lock alone are enough to evaluate
         # devShells.maya (it only uses the locked nixpkgs input), and a plain
         # directory is a path flake, so no ownership check runs at all.
-        # forceCopy, not a symlink: nix copies the flake directory into the store
-        # to evaluate it, and a symlink into /etc/static is dangling there
-        # (measured: "path '/nix/store/...-source/etc/static/maya/flake/flake.nix'
-        # does not exist").
-        environment.etc."maya/flake/flake.nix" = { source = ../../flake.nix; forceCopy = true; };
-        environment.etc."maya/flake/flake.lock" = { source = ../../flake.lock; forceCopy = true; };
+        # Written as text, not as a symlinked source: nix copies the flake
+        # directory into the store to evaluate it, and a symlink into /etc/static
+        # is dangling there (measured: "path
+        # '/nix/store/...-source/etc/static/maya/flake/flake.nix' does not
+        # exist"). environment.etc has no forceCopy (that is users.<name>.files);
+        # `text` writes the real bytes.
+        environment.etc."maya/flake/flake.nix".text = builtins.readFile ../../flake.nix;
+        environment.etc."maya/flake/flake.lock".text = builtins.readFile ../../flake.lock;
       };
     };
 

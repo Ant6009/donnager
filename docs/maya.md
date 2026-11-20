@@ -402,6 +402,46 @@ refuses a cap above free RAM, and `MAYA_RESIDENT_TIER_GB` / `MAYA_RAM_RESERVE_GB
 `/home/maya/src/maya.env` (docs/SETTINGS.md "Running outside NixOS packages":
 `maya.sh` reads `maya.env` from its own directory).
 
+### 4.6 What the two configs say, read off the box (2026-11-20)
+
+| | `maya-hy4-flash-maya-m.json` | `maya-cyber-frost.json` |
+| --- | --- | --- |
+| `exe` | `build/maya-hy4` | `build/maya`, plus `build-vision/bin/maya-vision` for pictures |
+| `model_name` | `hy4-flash` | `cyber-frost-3.8-ps` |
+| `--pack` | `/home/maya/models/Hy4-Flash-Maya-M/maya-hy4` | `/home/maya/models/CYBER-FROST-3.8-PS/pack` |
+| other args | `--max-context 32768`, `--mtp` | `--native`/`--ple-gguf` the one gguf, `--spec 4`, `--prefill auto`, `--expert-cache auto`, `--max-context 262144`, `--kv int8`, `--expert-profile pack/expert-profile.bin`, `--vision`, `--mtp pack/mtp` |
+| `reasoning_effort` | `high` | `xhigh` |
+| sampling | temp 0.9, top_p 1.0 | temp 1.0, top_p 0.95, top_k 20 |
+| `idle_unload_s` | 900 | 900 |
+
+`idle_unload_s` was **not** in either config until this afternoon: the pinned
+script's tail step (the one that adds it) never ran, because the run before it was
+interrupted mid-calibration. Both were patched with the same snippet the script
+uses (`idle_unload_s = 900`), as the `maya` user with
+`/home/maya/src/.venv/bin/python3` - bare `python3` is only on PATH inside
+`nix develop`, which is why the script's own tail step works and a `sudo python3`
+outside it does not.
+
+Disk, `du -sh` (GiB, not the decimal GB of `tools/hy4/download.json`):
+
+- `Hy4-Flash-Maya-M` **132 GB**: `Hy4-Flash-Maya-M-IQ3_XXS-00001-of-00002.gguf` 64,
+  the shared second shard - named `Hy4-Flash-Maya-XS-IQ2_XXS-00002-of-00002.gguf` -
+  60, `Hy4-Flash-mtp-BF16.gguf` 7.0, the DFly2 drafter 858 M,
+  `mmproj-Hy4-Flash-Maya-XS.gguf` 749 M, pack metadata 4.8 M. So the Maya-M
+  quantization is IQ3_XXS, and its second shard is a file shared with the XS
+  quant: the two quants do not cost 2x on disk.
+- `CYBER-FROST-3.8-PS` **108 GB**: `CYBER-FROST-3.8-PS-GUFF-Q5_K_M.gguf` 105
+  (112534603328 bytes, matching `tools/qwen/download.json`'s 112.5 GB), `pack/`
+  2.3 (`dense.bin` 1.5, `expert-profile.bin`, `native_experts.txt`, `mtp/`,
+  `tokenizer/`), `vision/mmproj-F16.gguf` 863 M.
+- `pack/native_experts.txt` header: `strata native experts v3: layer gu_type
+  d_type offset blob_bytes gate_off up_off down_off ... (n_expert 512, total
+  78014054400; absolute offsets in CYBER-FROST-3.8-PS-GUFF-Q5_K_M.gguf, or in the
+  named shard(s) beside it)` - 72.7 GiB of experts with offsets **inside the
+  single gguf**, no separate expert shards, which is what `--native` reads.
+- Both configs carry the same `api_key` as `/home/maya/maya-api.key`, both bind
+  `0.0.0.0:8080`, both write their own log next to the config.
+
 ## 5. Not verified on this box yet
 
 Installed and checked so far (2026-11-20): the module evaluates and activates the
@@ -409,16 +449,20 @@ user, directories, setup script and firewall rule; the engine is compiled
 (`build/maya-hy4`, 52 targets, sm_80) and Hy4-Flash Maya-M is downloaded
 (131.8 GB, sha256 checked) and configured (`maya-hy4-flash-maya-m.json`, context
 32768, drafting on with the MTP block, API key from `/home/maya/maya-api.key`);
-the pi provider exists; `systemctl start maya` is wired to stop strata. Not done:
-the CYBER-FROST setup, the speed calibration, and a run with the card to itself.
+the pi provider exists; `systemctl start maya` is wired to stop strata. Also done
+later the same day: the CYBER-FROST setup (`maya-cyber-frost.json`, 108 GB on disk,
+context 262144, its own MTP measurement), `idle_unload_s = 900` in both configs, and
+the 58 GiB tier cap in the unit (§4.5, §4.6). Still not done: a speed calibration in
+a window where nothing else is resident, and any run with the card to itself.
 
 Everything below is a claim from upstream's docs, not a measurement here:
 
-1. **A second `--setup` keeps both models in one install.** The docs say the
-   Models page lists "every model set up on this machine" and each model has its
-   own `maya-<model>.json`, but whether a second `--setup` rewrites or keeps the
-   first model's machine choices is untested. Check `ls /home/maya/src/maya-*.json`
-   after both setups, and `/v1/models` after start.
+1. ~~A second `--setup` keeps both models in one install.~~ **Measured:** after
+   both setups `ls` shows `maya-hy4-flash-maya-m.json` and `maya-cyber-frost.json`
+   side by side, the Hy4 one untouched apart from the `idle_unload_s` key added by
+   hand, with different `exe` (`build/maya-hy4` vs `build/maya`), different
+   `--pack`, and different sampling per model. `/v1/models` after a start that
+   loads both is still to be seen.
 2. ~~The config filenames.~~ **Measured:** `--setup --model hy4-flash-maya-m`
    wrote `maya-hy4-flash-maya-m.json`, named after the *setup* id, and inside it
    `"model_name": "hy4-flash"` is what the API takes. `startConfig` is set to

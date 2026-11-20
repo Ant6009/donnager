@@ -17,6 +17,7 @@ Last checked on donnager: 2026-11-20, Maya `v1.1.69` at `/home/maya/src`,
 | models on disk | `/var/lib/llama/models/Qwen3.8flash` | `/home/maya/models/Hy4-Flash-Maya-M` 132 GB, `/home/maya/models/CYBER-FROST-3.8-PS` 113 GB |
 | RAM held while loaded | 61.6 GiB (`MemoryCurrent`) | capped at 58 GiB by `MAYA_RAM_TIER_MAX_GB` (see §4) |
 | card held while loaded | ~49-50 GiB | Hy4 alone: to be measured; it got 15.1 GiB when strata was also up |
+| context its config asks for | 229376 | `hy4-flash` 32768, `cyber-frost-3.8-ps` 262144 with `--kv int8` |
 | API key | `~/.pi/agent/auth.json` → `strata` | `/home/maya/maya-api.key`, same value under `maya` in `~/.pi/agent/auth.json` |
 
 One of them runs at a time: `strata.service`, `llama-swap.service` and
@@ -88,10 +89,13 @@ or for one session without touching the default:
 pi --provider maya --model hy4-flash
 ```
 
-Both model entries and their context windows are in `~/.pi/agent/models.json`
-(`hy4-flash` at 32768, `cyber-frost-3.8-ps` at 131072 - **that second number is a
-guess until the CYBER-FROST config is read**: `sudo grep max-context
-/home/maya/src/maya-cyber-frost.json`).
+Both model entries and their context windows are in `~/.pi/agent/models.json`,
+and they now match what the configs on the box actually ask for: `hy4-flash`
+32768 (`maya-hy4-flash-maya-m.json`), `cyber-frost-3.8-ps` 262144
+(`maya-cyber-frost.json`, `--kv int8`). If you change one, change the other in
+the same minute (§4.2). `sudo` is needed to read them: `/home/maya` is `0700`, and
+a `sudo ls /home/maya/src/maya-*.json` fails because the glob is expanded by your
+own shell - use `sudo sh -c 'ls -l /home/maya/src/maya-*.json'`.
 
 ## 4. Tuning, in the order worth trying
 
@@ -115,7 +119,9 @@ time.
    (`maya-hy4-flash-maya-m.json`), to 65536 or 131072, and update the matching
    `contextWindow` in `~/.pi/agent/models.json`. Hy4's KV is int8: at 32768 the
    cache is 0.73 GB, and the engine's own line said F16 rows at 32768 would not
-   fit beside the dense parts.
+   fit beside the dense parts. CYBER-FROST is already configured at 262144 with
+   `--kv int8`; that is 8x Hy4's window, so if its load line complains, lowering
+   it is the first thing to try.
 3. **CPU lane threads** - `MAYA_CPU_THREADS = 12` in `maya.env`. 12 is what Maya
    chose here (half the 24 threads, no SMT siblings); Maya says it never goes
    above half the logical CPUs.
@@ -148,6 +154,14 @@ sudo systemctl start maya          # or: start it, let it settle, then measure
 
 `/etc/maya/setup.sh` keeps everything a previous run did, so it re-verifies
 instead of re-downloading. Per model it is 5-30 minutes.
+
+One number already exists, and it is a starved one: `maya-cyber-frost.json` carries
+`mtp_calibration: {off: 3.087, on: 3.461}` tok/s from 2026-11-20, measured while
+strata was resident with it. MTP drafting won by 12% under those conditions, so
+cyber-frost kept `--mtp`. In the clean window the number to look at is whether
+drafting wins by more once the card is not shared - the MTP block is 7.0 GB on disk
+(`Hy4-Flash-mtp-BF16.gguf` for Hy4, `pack/mtp/` inside CYBER-FROST's 2.3 GB pack)
+that would otherwise hold experts.
 
 ## 6. Make the switch permanent
 

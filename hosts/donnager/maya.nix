@@ -43,10 +43,12 @@ let
 
       startConfig = lib.mkOption {
         type = lib.types.str;
-        # Measured: `--setup --model hy4-flash-maya-m` wrote
-        # /home/maya/src/maya-hy4-flash-maya-m.json, and that config's own
-        # model_name is "hy4-flash" - what the API takes as the model name.
-        default = "maya-hy4-flash-maya-m.json";
+        # Both setups write model_name "hy4-flash", the API model name.
+        # Measured on donnager 2026-11-20 on the same 170HX: Maya-XS 37.9 tok/s
+        # decode (maya-bench.txt) vs Maya-M 9.1 tok/s with 4,879 of 20,992
+        # routed experts on the CPU lane over gen2 x4 PCIe. XS is the default
+        # for speed; set services.maya.startConfig to go back to Maya-M.
+        default = "maya-hy4-flash-maya-xs.json";
         description = ''
           Which per-model config the unit boots with. Maya names them
           maya-<setup model>.json, not maya-<model name>.json, so check what the

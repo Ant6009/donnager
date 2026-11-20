@@ -82,21 +82,13 @@ let
           mode = "0755";
         };
 
-        # The dev shell Maya is compiled in, readable by the maya user.
-        # `nix develop /etc/nixos#maya` cannot work as maya: nix's flake fetcher
-        # refuses a git repo it does not own - measured 2026-11-20, "opening Git
-        # repository \"/etc/nixos\": repository path '/etc/nixos' is not owned by
-        # current user". flake.nix and flake.lock alone are enough to evaluate
-        # devShells.maya (it only uses the locked nixpkgs input), and a plain
-        # directory is a path flake, so no ownership check runs at all.
-        # Written as text, not as a symlinked source: nix copies the flake
-        # directory into the store to evaluate it, and a symlink into /etc/static
-        # is dangling there (measured: "path
-        # '/nix/store/...-source/etc/static/maya/flake/flake.nix' does not
-        # exist"). environment.etc has no forceCopy (that is users.<name>.files);
-        # `text` writes the real bytes.
-        environment.etc."maya/flake/flake.nix".text = builtins.readFile ../../flake.nix;
-        environment.etc."maya/flake/flake.lock".text = builtins.readFile ../../flake.lock;
+        # (The build shell is not installed here: the setup script clones this
+        # repo into /home/maya/flake for its own `nix develop`, because nix's
+        # flake fetcher refuses a git repository it does not own and /etc/nixos
+        # is antoine's. An attempt to hand out flake.nix via environment.etc is
+        # what measured that - every form of it, .source and .text, lands as a
+        # symlink into /etc/static, which is dangling inside the store copy nix
+        # makes of any flake directory.)
       };
     };
 

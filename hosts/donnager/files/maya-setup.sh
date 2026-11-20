@@ -72,6 +72,23 @@ fi
 
 cd "$SRC"
 
+# NixOS refuses the standalone binaries pip wheels ship: they carry a generic
+# ld-linux interpreter ("NixOS cannot run dynamically linked executables
+# intended for generic linux environments", the stub-ld message). Maya takes
+# .venv/bin/<tool> before PATH's for cmake and ninja (maya.py's venv_tool), and
+# the venv's ninja wheel is what stopped the engine configure on the first run
+# here: cmake -G Ninja -DCMAKE_MAKE_PROGRAM=/home/maya/src/.venv/bin/ninja.
+# Point both at the build shell's own copies, which NixOS patched.
+fix_venv_tools() {
+  for t in ninja cmake; do
+    wheel="$SRC/.venv/bin/$t"
+    real=$(command -v "$t" 2>/dev/null) || continue
+    [ -e "$wheel" ] || [ -L "$wheel" ] || continue
+    ln -sf "$real" "$wheel"
+    echo "  $wheel -> $real (the pip wheel binary is not executable on NixOS)"
+  done
+}
+
 # --- API key: never in git --------------------------------------------------
 # Reuse whatever an existing Maya config carries, then the key file, then make
 # one and print it once (same order as /etc/strata/setup.sh).
@@ -97,14 +114,26 @@ fi
 # --yes takes the recommended answers; --download-model is what actually lets
 # it start the ~141 GB download. Maya builds the maya-hy4 engine first.
 echo "=== setup: $HY4_MODEL"
-if [ -n "$CONTEXT" ]; then
-  ./maya.sh --setup --model "$HY4_MODEL" --context "$CONTEXT" \
-    --models-dir "$MODELS" --host "$HOST" --port "$PORT" --api-key "$KEY" \
-    --yes --download-model
-else
-  ./maya.sh --setup --model "$HY4_MODEL" \
-    --models-dir "$MODELS" --host "$HOST" --port "$PORT" --api-key "$KEY" \
-    --yes --download-model
+hy4_setup() {
+  if [ -n "$CONTEXT" ]; then
+    ./maya.sh --setup --model "$HY4_MODEL" --context "$CONTEXT" \
+      --models-dir "$MODELS" --host "$HOST" --port "$PORT" --api-key "$KEY" \
+      --yes --download-model
+  else
+    ./maya.sh --setup --model "$HY4_MODEL" \
+      --models-dir "$MODELS" --host "$HOST" --port "$PORT" --api-key "$KEY" \
+      --yes --download-model
+  fi
+}
+
+# The venv only exists after Maya's own setup has created it, so the first call
+# is the one that discovers the wheel binaries and stops at the configure step.
+# Maya keeps everything a stopped setup already did, so one retry continues it.
+fix_venv_tools
+if ! hy4_setup; then
+  echo "setup stopped; relinking the build shell's ninja and cmake and trying once more"
+  fix_venv_tools
+  hy4_setup
 fi
 
 # --- model 2: Qwen-3.8-Flash-Next (CYBER-FROST) ----------------------------

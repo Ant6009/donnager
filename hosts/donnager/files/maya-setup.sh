@@ -10,14 +10,17 @@
 #
 #   sudo -u maya /etc/maya/setup.sh
 #
-# It pulls this repo's build shell (nix develop /etc/nixos#maya: nvcc 13.4,
-# gcc 13, cmake, ninja, python) whenever it is not already inside one.
+# It pulls the build shell from /etc/maya/flake (a maya-readable copy of
+# flake.nix + flake.lock that the rebuild installs) whenever it is not already
+# inside one. It cannot take the shell from /etc/nixos itself when run as maya:
+# nix refuses to open a git repository it does not own.
 #
 # ~254 GB of downloads, from Hugging Face, into /home/maya/models. The build
 # itself is 20-40 minutes. Nothing here is automatic: read what it prints.
 set -eu
 
 FLAKE=/etc/nixos                 # donnager's checkout of this repo (devShells.maya)
+FLAKE_COPY=/etc/maya/flake       # flake.nix + flake.lock only, readable by maya
 REPO=https://github.com/mw00/project-maya.git
 REV=v1.1.69                      # main at e9cb6510e092 (2026-11-20), the Hy4-Flash release line
 HOME_DIR=/home/maya
@@ -39,9 +42,12 @@ in_build_shell() {
   [ -n "${IN_NIX_SHELL:-}" ] && command -v nvcc >/dev/null 2>&1
 }
 
+# As the maya user only the copy works: nix's flake fetcher refuses a git repo it
+# does not own, and a plain directory is a path flake with nothing to own.
 if ! in_build_shell; then
-  echo "entering $FLAKE#maya (nvcc + gcc 13 + cmake + ninja + python)"
-  exec nix develop "$FLAKE#maya" -c "$0" "$@"
+  if [ -f "$FLAKE_COPY/flake.nix" ]; then SHELL_FLAKE=$FLAKE_COPY; else SHELL_FLAKE=$FLAKE; fi
+  echo "entering $SHELL_FLAKE#maya (nvcc + gcc 13 + cmake + ninja + python)"
+  exec nix develop "$SHELL_FLAKE#maya" -c "$0" "$@"
 fi
 
 nvcc --version | sed -n 's/.*release \([0-9.]*\).*/nvcc \1/p' | head -1

@@ -81,6 +81,16 @@ let
           source = ./files/maya-setup.sh;
           mode = "0755";
         };
+
+        # The dev shell Maya is compiled in, readable by the maya user.
+        # `nix develop /etc/nixos#maya` cannot work as maya: nix's flake fetcher
+        # refuses a git repo it does not own - measured 2026-11-20, "opening Git
+        # repository \"/etc/nixos\": repository path '/etc/nixos' is not owned by
+        # current user". flake.nix and flake.lock alone are enough to evaluate
+        # devShells.maya (it only uses the locked nixpkgs input), and a plain
+        # directory is a path flake, so no ownership check runs at all.
+        environment.etc."maya/flake/flake.nix".source = ../../flake.nix;
+        environment.etc."maya/flake/flake.lock".source = ../../flake.lock;
       };
     };
 

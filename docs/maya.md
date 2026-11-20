@@ -199,10 +199,17 @@ strata.
 
 **The guard that makes installing early safe.** `unitConfig.ConditionPathExists =
 "/home/maya/src/maya.sh"`. Without it, an enabled Maya on a box where §4.2 has not
-run would start a unit that cannot run, and `Conflicts=` plus
-`Restart = "on-failure"` would drop strata every 30 seconds, leaving no inference
-server at all. A start condition that is not met skips the unit without it ever
-activating: no conflict, no restart loop.
+run would fail ExecStart every time and `Restart = "on-failure"` would re-fail it
+every 30 seconds forever.
+
+Measured on donnager 2026-11-20 with the engine absent (`sudo systemctl start maya`):
+the unit is skipped cleanly - journal `Project Maya inference engine ... skipped,
+unmet condition check ConditionPathExists=/home/maya/src/maya.sh`, `Result=success`,
+`ActiveState=inactive`, no restart attempts. What the condition does **not** do is
+block `Conflicts=`: strata went inactive anyway and took 5 s to bring back with
+`sudo systemctl start strata`. So the guard prevents the failure loop, not the
+hand-over: starting Maya before §4.2 has run is harmless but pointless, and it costs
+strata until you start it again.
 
 - Port, host and API key are **not** in the unit: they are in the config the
   setup script wrote. Passing `--port` to `maya.sh --config ...` is not what
@@ -285,6 +292,12 @@ Persistent choice is one flag in `hosts/donnager/default.nix`:
 hand-over is `systemctl start maya` / `systemctl start strata`. Budget minutes for a
 swap in either direction: Maya's load and unload are slow (§4.3), strata's park
 and checkpoint paths are the fast ones.
+
+Measured on the box 2026-11-20, before §4.2: `sudo systemctl start maya` on a machine
+with no `/home/maya/src` skips maya (unmet condition) and still stops strata;
+`sudo systemctl start strata` restored it 5 s later, `active` on 8081 since. Maya's
+unit is `linked` (installed, not enabled), which is what `wantedBy` gated off
+`!services.strata.enable` looks like in `systemctl show -p UnitFileState`.
 
 ## 5. Not verified on this box yet
 

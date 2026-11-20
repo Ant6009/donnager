@@ -108,12 +108,18 @@ let
         conflicts = [ "strata.service" "llama-swap.service" ];
 
         unitConfig = {
-          # services.maya.enable = true is also the flag that says "§4.2 has
-          # run". Flipping it while /home/maya/src does not exist would start a
-          # unit that cannot run, and Conflicts= would then take strata down
-          # every 30 s (Restart=on-failure), leaving the box with no inference
-          # server. A start condition that is not met skips the unit without it
-          # ever activating: no conflict, no restart loop, strata untouched.
+          # services.maya.enable = true is not the flag that says "§4.2 has run",
+          # so the unit has to survive being enabled on a box with no checkout:
+          # without this condition maya.sh is missing, ExecStart fails, and
+          # Restart=on-failure re-fails every 30 s forever.
+          #
+          # Measured on donnager 2026-11-20 (§4.4): the condition does skip the
+          # unit cleanly - journal "skipped, unmet condition check
+          # ConditionPathExists=/home/maya/src/maya.sh", Result=success, no
+          # restart attempts. It does NOT stop Conflicts= from firing: `systemctl
+          # start maya` still took strata down (back up 5 s later). Starting Maya
+          # before §4.2 has run is therefore harmless but pointless, and it costs
+          # strata.
           ConditionPathExists = "${cfg.srcDir}/maya.sh";
         };
 

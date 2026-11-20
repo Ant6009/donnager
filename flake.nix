@@ -138,6 +138,11 @@
         export PATH="${llmPkgs.gcc13}/bin:$PATH"
         export CC="${llmPkgs.gcc13}/bin/gcc"
         export CXX="${llmPkgs.gcc13}/bin/g++"
+        # Maya pip-installs its own .venv (numpy, pillow, ...), and those are
+        # manylinux wheels: without libstdc++.so.6 on LD_LIBRARY_PATH their C
+        # extensions fail to import on NixOS. The same path is in the service unit
+        # (hosts/donnager/maya.nix), which has no shell to inherit it from.
+        export LD_LIBRARY_PATH="${llmPkgs.stdenv.cc.cc.lib}/lib:''${LD_LIBRARY_PATH:-}"
         nvcc --version | sed -n 's/.*release \([0-9.]*\).*/nvcc \1/p' | head -1
         echo "gcc: $(g++ --version | head -1)"
         echo "Maya takes the CUDA arch from this PC's GPUs (sm_80 here); pass --host-compiler g++ if it ever rejects this one."

@@ -96,7 +96,7 @@ let
       };
     };
 
-  service = { config, lib, ... }:
+  service = { config, lib, pkgs, ... }:
     let cfg = config.services.maya; in
     lib.mkIf cfg.enable {
       systemd.services.maya = {
@@ -151,7 +151,15 @@ let
             # carries a RUNPATH into the CUDA toolkit's lib/stubs, i.e. a STUB
             # libcuda, and dies with "CUDA driver is a stub library". An
             # inherited LD_LIBRARY_PATH beats the RUNPATH.
-            "LD_LIBRARY_PATH=/run/opengl-driver/lib"
+            #
+            # stdenv.cc.cc.lib is for Maya's .venv: pip's numpy is a manylinux
+            # wheel, and spawning `python` with libstdc++.so.6 unreachable failed
+            # the CYBER-FROST setup with "ImportError: importing the numpy
+            # C-extensions failed ... Original error was: libstdc++.so.6: cannot
+            # open shared object file". Inside `nix develop` it works because the
+            # shell exports that path; a service start has no shell, so the unit
+            # has to carry it.
+            "LD_LIBRARY_PATH=/run/opengl-driver/lib:${pkgs.stdenv.cc.cc.lib}/lib"
           ];
 
           # Port, host and API key are NOT here: they live in the config the

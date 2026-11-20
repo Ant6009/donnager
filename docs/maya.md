@@ -178,16 +178,22 @@ What it pins, in order:
 | API key | reuse the key an existing `maya-*.json` carries, else `/home/maya/maya-api.key`, else generate one and print it once |
 | Hy4-Flash | `./maya.sh --setup --model hy4-flash-maya-m --models-dir /home/maya/models --host 0.0.0.0 --port 8080 --api-key "$KEY" --yes --download-model` |
 | Qwen | the same with `--model cyber-frost` |
-| Calibrate | `./maya.sh --config <cfg> --speed-calibration --no-start` for each config (skip with `CALIBRATE=0`) |
+| Calibrate | opt-in (`CALIBRATE=1`): `./maya.sh --config <cfg> --speed-calibration --no-start` per config. Off by default now: it loads the model, and it measures nothing useful while strata is resident |
 | Idle unload | writes `"idle_unload_s": 900` into each config (skip with `IDLE_UNLOAD=0`) |
 | Verify | lists the `maya-*.json` files it wrote and each one's model name, host, port, context |
 
 Flags deliberately **not** pinned: `--context` (Hy4 needs more VRAM the longer
 the context and Maya "picks the context that fits the card", 4K to 1M — pin it
-later with `--setup --context N` once the load lines are known), `--no-vision`
-(both models read pictures; Hy4's needs no VRAM of its own since v1.1.69),
-`--drafting` (the MTP block costs ~4 GiB of VRAM that would otherwise hold
-experts; Maya measures whether it is faster here, `--drafting off` to skip it).
+later with `--setup --context N` once the load lines are known) and `--no-vision`
+(both models read pictures; Hy4's needs no VRAM of its own since v1.1.69).
+
+`--drafting on` **is** pinned, and that is a deliberate change from the default.
+`--yes` means `--drafting measure`, which loads the model twice to time the
+drafter (docs/SETUP.md: "`on` = draft with it, `off` = without it - both skip the
+measuring"). Running that measurement on a box with strata resident loaded 112 GB
+of CYBER-FROST against strata's 54.7 GB and left 7 GB of RAM free; the number it
+would have produced measures a starved machine anyway. The measurement belongs in
+the window of docs/maya-runbook.md §5, with the card to itself.
 
 `--yes` takes the recommended answers; `--download-model` is what actually lets
 the download start; `--plain` gets the text setup if the script is ever run from
@@ -359,6 +365,42 @@ with no `/home/maya/src` skips maya (unmet condition) and still stops strata;
 `sudo systemctl start strata` restored it 5 s later, `active` on 8081 since. Maya's
 unit is `linked` (installed, not enabled), which is what `wantedBy` gated off
 `!services.strata.enable` looks like in `systemctl show -p UnitFileState`.
+
+### 4.5 The RAM tier, measured, and the 58 GiB cap in the unit
+
+What the box reported at the moment a model was about to load, with strata
+stopped, taken from `/proc/meminfo`:
+
+```
+MemTotal:      98615664 kB   = 94.03 GiB
+MemAvailable:  92863216 kB   = 88.55 GiB     (MemFree 1611408 kB = 1.54 GiB)
+SwapTotal:     12025852 kB   = 11.47 GiB     (SwapFree 11546856 kB = 11.01 GiB)
+zfs: arc 6.17 GiB above its 0.10 GiB floor   (arcstats: arc 6611902976, c_min 107374182)
+```
+
+- "88 GB free" is not 88 GB free: 51 GiB was reclaimable page cache (the 51 GiB
+  strata had just stopped holding; `buff/cache` 51 GB against `free` 1.5 GB), and
+  Maya itself adds ZFS's reclaimable ARC on top of `MemAvailable` (its `mem_gb`,
+  with `zfs_arc_gb` and the comment that `MemAvailable` leaves it out).
+- Maya's expert-pool formula (docs/SETTINGS.md, "RAM as the expert pool") is
+  resident tier `0.7 x MemAvailable + 0.8 x SwapFree`, streamed rows
+  `0.15 x MemAvailable`: **70.2 GiB pinned** here, and its "floor" - what it
+  leaves for everything else - is `max(4 GiB, 12% of RAM)` = 11.3 GiB.
+- strata alone keeps 61.6 GiB (`MemoryCurrent=66151907328`), and Maya choosing
+  70 GiB pinned is 9 GiB more than that, against a 94 GiB machine.
+- 88 GB is Maya's **pool**, not its pinned tier: the tier plus the experts it
+  reads through the page cache plus the 63.4 GB n-gram table on the SSD. Capping
+  the pinned part is headroom for the kernel, the python server and the page
+  cache, not lost reach.
+
+So `hosts/donnager/maya.nix` adds `services.maya.ramTierMaxGb` (default **58**,
+`null` = Maya chooses) and puts it in the unit as `MAYA_RAM_TIER_MAX_GB=58`.
+That is 58 GiB pinned where strata keeps 61.6, and the rest of the pool stays
+available to the page cache. Maya enforces it at load (`ram tier cap: 58.0 GiB`),
+refuses a cap above free RAM, and `MAYA_RESIDENT_TIER_GB` / `MAYA_RAM_RESERVE_GB`
+/ `MAYA_STREAM_GB` are the neighbouring knobs. Without a rebuild it can be set in
+`/home/maya/src/maya.env` (docs/SETTINGS.md "Running outside NixOS packages":
+`maya.sh` reads `maya.env` from its own directory).
 
 ## 5. Not verified on this box yet
 

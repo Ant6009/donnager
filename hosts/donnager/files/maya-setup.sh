@@ -122,6 +122,11 @@ fi
 # it start the ~132 GB download; --no-start ends the setup without launching the
 # dashboard (without it the setup starts Maya in the foreground and the script
 # waits there - Ctrl+C then takes the script down too, EXIT=130, measured).
+# --drafting on pins the MTP drafter without measuring it: `--yes` defaults to
+# `--drafting measure`, which loads the model TWICE to time it (docs/SETUP.md:
+# "`on` = draft with it, `off` = without it - both skip the measuring"). Measured
+# here: that measurement loaded 112 GB of CYBER-FROST while strata still held
+# 54.7 GB of RAM and 50 GB of the card, and 7 GB of RAM was left.
 # Maya names the config after the setup model: hy4-flash-maya-m wrote
 # maya-hy4-flash-maya-m.json, whose own model_name is "hy4-flash".
 echo "=== setup: $HY4_MODEL"
@@ -129,11 +134,11 @@ hy4_setup() {
   if [ -n "$CONTEXT" ]; then
     ./maya.sh --setup --model "$HY4_MODEL" --context "$CONTEXT" \
       --models-dir "$MODELS" --host "$HOST" --port "$PORT" --api-key "$KEY" \
-      --yes --download-model --no-start
+      --yes --download-model --no-start --drafting on
   else
     ./maya.sh --setup --model "$HY4_MODEL" \
       --models-dir "$MODELS" --host "$HOST" --port "$PORT" --api-key "$KEY" \
-      --yes --download-model --no-start
+      --yes --download-model --no-start --drafting on
   fi
 }
 
@@ -154,15 +159,22 @@ fi
 echo "=== setup: $QWEN_MODEL"
 ./maya.sh --setup --model "$QWEN_MODEL" \
   --models-dir "$MODELS" --host "$HOST" --port "$PORT" --api-key "$KEY" \
-  --yes --download-model --no-start
+  --yes --download-model --no-start --drafting on
 
-# --- calibrate by hand, once ------------------------------------------------
-# A service start measures nothing (nobody is there to wait), so upstream says
-# to run these in a terminal with Maya stopped. They load the model a few times
-# and keep the answer in the config. Skip with CALIBRATE=0.
-case "${CALIBRATE:-1}" in
-  0) echo "CALIBRATE=0: skipped the speed calibration" ;;
-  *)
+# --- calibrate by hand, in a window of its own ------------------------------
+# Opt-in (CALIBRATE=1), because it is the part that loads models: --speed-
+# calibration "loads the model a few times" (5-30 minutes per config, with Maya
+# stopped) and the drafter measurement loads it twice. strata holds 54.7 GB of
+# RAM and 50 GB of the card here, so a calibration that runs while strata is up
+# measures a starved machine and puts the box within a few GB of running out.
+# Run it in the window described in docs/maya-runbook.md: strata stopped, nothing
+# else on the card.
+case "${CALIBRATE:-0}" in
+  1) ;;
+  *) echo "CALIBRATE unset or 0: no speed calibration (it loads the model; docs/maya-runbook.md §5)" ;;
+esac
+case "${CALIBRATE:-0}" in
+  1)
     for cfg in maya-*.json; do
       if [ -f "$cfg" ]; then
         echo "=== speed calibration: $cfg (5-30 minutes, Maya must be stopped)"

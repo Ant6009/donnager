@@ -36,9 +36,14 @@ other: the card and the 94 GB of RAM only hold one of them. Which one boots is
 negation, so `services.maya.enable = true` only installs the unit) plus a
 rebuild; `systemctl start strata` (or
 `maya`, or `llama-swap`) is the one-command swap without a rebuild — it stops
-the other. Expect minutes either way: Maya pins nearly all the free RAM for its
-expert tier and takes minutes to load and to hand the card back (docs/maya.md
-§4.4), strata's park/checkpoint path is the fast one.
+the other. Expect minutes either way: Maya's pinned expert tier is capped at
+58 GiB by `services.maya.ramTierMaxGb` (docs/maya.md §4.5 explains the number), it
+still wants the rest of the pool through the page cache, and it takes minutes to
+load and to hand the card back (docs/maya.md §4.4). strata's park/checkpoint path
+is the fast one.
+**Do the switch by hand with [docs/maya-runbook.md](docs/maya-runbook.md)** -
+stop strata, start maya, point pi at :8080, which log lines tell you whether the
+experts landed on the card or on the CPU lane, and the tuning knobs in order.
 
 Inside Maya there is a second, cheaper switch: it runs Hy4-Flash
 (`hy4-flash`) and Qwen-3.8-Flash-Next (`cyber-frost-3.8-ps`) in one install on

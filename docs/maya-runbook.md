@@ -99,7 +99,7 @@ All of these need a restart of the service, and only one model resident at a
 time.
 
 1. **Pinned expert tier** - `services.maya.ramTierMaxGb` in
-   `hosts/donnager/default.nix` (default **58** GiB; `null` lets Maya choose).
+   `hosts/donnager/default.nix` (default **58** GiB; `0` lets Maya choose).
    Why a cap exists: with strata stopped, `/proc/meminfo` on donnager read
    `MemTotal 94 GiB`, `MemAvailable 88.6 GiB`, `SwapFree 11 GiB`, and Maya's own
    formula (`0.7 x MemAvailable + 0.8 x SwapFree`, docs/SETTINGS.md "RAM as the

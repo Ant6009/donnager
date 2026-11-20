@@ -55,7 +55,14 @@ let
       };
 
       ramTierMaxGb = lib.mkOption {
-        type = lib.types.nullOr lib.types.ints;
+        # 0 means "no cap, Maya chooses".
+        # types.int, not types.ints: lib.types.ints is the attrset of integer
+        # types (ints.positive, ints.between, ...), and using it as a type breaks
+        # the build when the option is read (modules.nix:1175 wants
+        # opt.type.deprecationMessage). nullOr of it fails one step earlier, at
+        # lib/types.nix:1766 (nullOr.getSubModules -> the primitive's missing
+        # getSubModules). Both measured on this flake, 2026-11-20.
+        type = lib.types.int;
         default = 58;
         # Measured on donnager 2026-11-20 (docs/maya-runbook.md §2): at the moment
         # Maya loaded, /proc/meminfo read MemTotal 94 GiB, MemAvailable 88.6 GiB
@@ -68,14 +75,14 @@ let
         # the SSD (docs/SETTINGS.md's "what Maya does with your RAM"), so capping
         # the pinned part is not a loss of reach, it is headroom for the kernel, the
         # server, the page cache and strata's swap.
-        # Set null to let Maya choose for itself. A value above free RAM is refused
+        # Set 0 to let Maya choose for itself. A value above free RAM is refused
         # by Maya itself (it falls back to its own choice).
         # Tuning: this is the knob for "too many experts on the CPU lane, too
         # little RAM". It is also settable without a rebuild in
         # /home/maya/src/maya.env (MAYA_RAM_TIER_MAX_GB = 58).
         description = ''
           MAYA_RAM_TIER_MAX_GB for the service: the ceiling on Maya's pinned
-          resident expert tier, in GiB. null = Maya chooses from MemAvailable.
+          resident expert tier, in GiB. 0 = Maya chooses from MemAvailable.
         '';
       };
     };
@@ -185,7 +192,7 @@ let
             # shell exports that path; a service start has no shell, so the unit
             # has to carry it.
             "LD_LIBRARY_PATH=/run/opengl-driver/lib:${pkgs.stdenv.cc.cc.lib}/lib"
-          ] ++ lib.optionals (cfg.ramTierMaxGb != null) [
+          ] ++ lib.optionals (cfg.ramTierMaxGb > 0) [
             # Applied whenever the unit runs, which is only ever with strata and
             # llama-swap stopped (Conflicts= above): the cap is sized against the
             # whole 94 GiB pool being Maya's.

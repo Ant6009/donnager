@@ -394,7 +394,7 @@ zfs: arc 6.17 GiB above its 0.10 GiB floor   (arcstats: arc 6611902976, c_min 10
   cache, not lost reach.
 
 So `hosts/donnager/maya.nix` adds `services.maya.ramTierMaxGb` (default **58**,
-`null` = Maya chooses) and puts it in the unit as `MAYA_RAM_TIER_MAX_GB=58`.
+0 = Maya chooses) and puts it in the unit as `MAYA_RAM_TIER_MAX_GB=58`.
 That is 58 GiB pinned where strata keeps 61.6, and the rest of the pool stays
 available to the page cache. Maya enforces it at load (`ram tier cap: 58.0 GiB`),
 refuses a cap above free RAM, and `MAYA_RESIDENT_TIER_GB` / `MAYA_RAM_RESERVE_GB`

@@ -43,11 +43,14 @@ let
 
       startConfig = lib.mkOption {
         type = lib.types.str;
-        default = "maya-hy4-flash.json";
+        # Measured: `--setup --model hy4-flash-maya-m` wrote
+        # /home/maya/src/maya-hy4-flash-maya-m.json, and that config's own
+        # model_name is "hy4-flash" - what the API takes as the model name.
+        default = "maya-hy4-flash-maya-m.json";
         description = ''
           Which per-model config the unit boots with. Maya names them
-          maya-<model>.json, so check what the setup actually wrote before
-          flipping services.maya.enable: ls /home/maya/src/maya-*.json
+          maya-<setup model>.json, not maya-<model name>.json, so check what the
+          setup wrote: ls /home/maya/src/maya-*.json
         '';
       };
     };

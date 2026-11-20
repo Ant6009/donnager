@@ -122,11 +122,32 @@ compiler, because nixpkgs' own stdenv here is gcc 16.2 and nvcc will refuse a
 host compiler that new; `--host-compiler g++-13` is the escape hatch if it ever
 picks one anyway.
 
+**Measured on the first run here (2026-11-20, Maya and strata both loaded).**
+The engine's own lines, from `/home/maya/src/maya-hy4-flash-maya-m.log`:
+
+| Line | What it says here |
+| --- | --- |
+| VRAM it got | `14.6 GB of VRAM over 1 GPUs` (strata held 49.3 GB of the 64 GB at the time, `nvidia-smi` per-process: strata 49302 MiB, maya-hy4 15100 MiB) |
+| Expert placement | `CPU lane: 164 of 20992 routed experts in VRAM (1%), the rest on 12 CPU threads from the model's file` |
+| Context | `context 32768`, chosen by Maya; KV in 8-bit rows (`0.73 GB` at 32K, F16 would be `1.29 GB`) |
+| Prompt chunk | `prompt chunk: 1024 tokens` (auto: the largest of 4096 / 2048 / 1024 the remaining VRAM holds) |
+| Engram table | `4 layers, the table read from the disk a row at a time` |
+| Load time | `loaded in 28.2 s`, `warmed up in 20.5 s` |
+| Pictures | vision tower `815 MB in host memory`, up to 829 MB on the card while one is read, "no VRAM kept for pictures" |
+| Speed, one request | 29 prompt tokens in 11.7 s (**2.5 tok/s prefill**), 42 tokens in 19.9 s (**2.1 tok/s decode**), draft 38 proposed / 28 accepted |
+
+That is the starved case: the card already had 15 GB free, so Maya put 99% of the
+routed experts on the CPU lane and 2.1 tok/s is what a 12-thread CPU lane costs.
+It is not the answer to the PCIe question — the same engine with the card to
+itself should hold a much larger expert share in VRAM. The clean run is §4.2's
+last step with strata stopped, and `./maya.sh --report` afterwards.
+
 ## 4. Install plan
 
 ### 4.1 Pre-flight
 
-1. Disk: `df -h /home` — needs ~254 GB for both models, ~141 GB for Hy4 alone.
+1. Disk: `df -h /home` — needs ~245 GB for both models (measured: Hy4 Maya-M is
+   131.8 GB in 2 files), ~132 GB for Hy4 alone.
 2. Outbound HTTPS to huggingface.co (the setup prints every download and its
    sha256 before starting it; it continues where a download stopped).
 3. **Done 2026-11-20.** The rebuild with `services.maya.enable = true` created
@@ -152,7 +173,7 @@ What it pins, in order:
 
 | Step | Command |
 | --- | --- |
-| Build shell | `nix develop /etc/nixos#maya -c ...` (self-wrapping, only when `nvcc` is missing) |
+| Build shell | copies `flake.nix` + `flake.lock` into `/home/maya/flake`, then `nix develop /home/maya/flake#maya -c ...` (self-wrapping, only when `nvcc` is missing) |
 | Checkout | `git clone https://github.com/mw00/project-maya.git /home/maya/src` at `v1.1.69` |
 | API key | reuse the key an existing `maya-*.json` carries, else `/home/maya/maya-api.key`, else generate one and print it once |
 | Hy4-Flash | `./maya.sh --setup --model hy4-flash-maya-m --models-dir /home/maya/models --host 0.0.0.0 --port 8080 --api-key "$KEY" --yes --download-model` |
@@ -176,6 +197,44 @@ Updating later: `cd /home/maya/src && git fetch && git checkout <tag>`, then
 `./maya.sh` (recompiles only what changed, does not download the model again).
 `--import-model FOLDER` / `--model-dir DIR` take files downloaded some other
 way, matched by size and sha256.
+
+**The four things that broke on the first run here, all now in the script.**
+
+1. `nix develop /etc/nixos#maya` as the maya user: `repository path '/etc/nixos'
+   is not owned by current user` (libgit2 error 7), and `git clone /etc/nixos`
+   says the same in git's words (`detected dubious ownership in repository at
+   '/etc/nixos/.git'`). Giving the flake to `/etc/maya/flake` via
+   `environment.etc` does not help either: `.source` and `.text` both land as a
+   symlink into `/etc/static`, which is dangling inside the store copy nix makes
+   of a flake directory (`environment.etc` has no `forceCopy`; that option
+   belongs to `users.<name>.files`). Copying the two files into
+   `/home/maya/flake` works: a directory is a path flake, nothing has to be
+   owned, and `devShells.maya` needs only the locked nixpkgs input.
+2. Maya takes `.venv/bin/<tool>` before PATH's (maya.py's `venv_tool`), and pip
+   wheel binaries are not executable on NixOS: the engine configure died on
+   `-DCMAKE_MAKE_PROGRAM=/home/maya/src/.venv/bin/ninja` with "NixOS cannot run
+   dynamically linked executables intended for generic linux environments".
+   `cmake` dodged the same trap by accident - `pick_cmake` runs `--version` and
+   the wheel scored (0,0), so the shell's cmake 4.4.4 was used. `fix_venv_tools`
+   now links the shell's ninja and cmake over the venv's copies. The venv exists
+   only after Maya's own setup created it, so the script relinks and retries the
+   Hy4 setup once; a stopped setup keeps everything it already did.
+3. The setup's last act is to start the model in the foreground. Ctrl+C there
+   stopped the script as well (`EXIT=130`) with CYBER-FROST never attempted, so
+   the script now runs `trap '' INT`: Maya's python installs its own handler and
+   still stops on Ctrl+C, the script goes on to the next model. `--no-start` is
+   passed on both setups too (maya.py's own wording: "set up, but do not start the
+   dashboard"), and the Ctrl+C is what ends the run when it starts anyway.
+4. Run `git pull` in `/etc/nixos` as antoine, not with `sudo`: root has no GitHub
+   key (`Please make sure you have the correct access rights`), and /etc/nixos is
+   antoine-owned. Rebuild with `sudo nixos-rebuild switch --flake .#donnager`.
+
+With the engine compiled, the model step says what it is fetching in plain
+numbers - for Maya-M: 131.8 GB in 2 files, the second one shared with Maya-XS
+(`Hy4-Flash-Maya-XS-IQ2_XXS-00002-of-00002.gguf`, the n-gram table), from
+`peasantsmith/Hy4-Flash-Maya-GGUF`, `776 GB free there`, and the exact resumable
+`curl` commands it uses. Measured throughput here: 113 MB/s, 2 files at once,
+18 minutes for 132 GB.
 
 ### 4.3 NixOS module `hosts/donnager/llama-swap.nix`, `strata.nix`, `maya.nix`
 
@@ -271,13 +330,15 @@ sessions instead of holding 76 GB of pinned tier overnight.
 
 - **pi (rocinante):** configured 2026-11-20. Provider `maya` in
   `~/.pi/agent/models.json`, `baseUrl http://192.168.68.128:8080/v1`, two model
-  entries (`hy4-flash` at 32K, `cyber-frost-3.8-ps` at 128K; **both context
-  windows are placeholders** — set them to what §4.2 actually writes), the key in
+  entries: `hy4-flash` at 32768 (measured, this is what Maya chose for this card)
+  and `cyber-frost-3.8-ps` at 131072 (**placeholder** — set it to what the CYBER-FROST
+  setup writes), the key in
   `~/.pi/agent/auth.json` as `{"maya":{"type":"api_key","key":"..."}}` (0600,
   outranks env vars), and `~/.local/bin/pi-backend [llama-swap|strata|maya|maya-qwen]`
   sets the default for a NEW session (`maya` → `hy4-flash`, `maya-qwen` →
   `cyber-frost-3.8-ps`); `pi --provider maya --model hy4-flash` is the immediate
-  form. Nothing on 8080 answers until §4.2 has run.
+  form. 8080 answers as soon as Maya is started (`systemctl start maya`, or
+  `cd /home/maya/src && ./maya.sh --config maya-hy4-flash-maya-m.json`).
 - **Open WebUI (donnager):** Maya is an OpenAI-compatible endpoint at
   `http://127.0.0.1:8080/v1`; add it as a provider in the UI (per-chat pick).
   With `--host 0.0.0.0` it answers `401 missing or wrong API key` without one,
@@ -302,9 +363,12 @@ unit is `linked` (installed, not enabled), which is what `wantedBy` gated off
 ## 5. Not verified on this box yet
 
 Installed and checked so far (2026-11-20): the module evaluates and activates the
-user, directories, setup script and firewall rule; `/etc/maya/setup.sh` is on the
-box; the pi provider exists; `systemctl start maya` is wired to stop strata. Not
-done: §4.2 (engine build, model downloads, calibration), so nothing listens on 8080.
+user, directories, setup script and firewall rule; the engine is compiled
+(`build/maya-hy4`, 52 targets, sm_80) and Hy4-Flash Maya-M is downloaded
+(131.8 GB, sha256 checked) and configured (`maya-hy4-flash-maya-m.json`, context
+32768, drafting on with the MTP block, API key from `/home/maya/maya-api.key`);
+the pi provider exists; `systemctl start maya` is wired to stop strata. Not done:
+the CYBER-FROST setup, the speed calibration, and a run with the card to itself.
 
 Everything below is a claim from upstream's docs, not a measurement here:
 
@@ -313,12 +377,14 @@ Everything below is a claim from upstream's docs, not a measurement here:
    own `maya-<model>.json`, but whether a second `--setup` rewrites or keeps the
    first model's machine choices is untested. Check `ls /home/maya/src/maya-*.json`
    after both setups, and `/v1/models` after start.
-2. **The config filenames.** `model_name` for Hy4 is `hy4-flash`, so
-   `startConfig = maya-hy4-flash.json` is the expected name (upstream names the
-   config after the model, `maya-<model>.json`); the setup script prints what it
-   actually wrote. If it differs, `services.maya.startConfig` is the knob.
+2. ~~The config filenames.~~ **Measured:** `--setup --model hy4-flash-maya-m`
+   wrote `maya-hy4-flash-maya-m.json`, named after the *setup* id, and inside it
+   `"model_name": "hy4-flash"` is what the API takes. `startConfig` is set to
+   that name. The config also carries `host`, `port`, `api_key`, `log`,
+   `reasoning_effort: "high"` and a `thinking budget: 32768 tokens`.
 3. **Expert-pool residency and the CPU/PCIe choice on a Gen1 x4 link** (§3):
-   read the load lines before believing any speed number.
+   partly answered (§3's measured block: 164 of 20992 experts in VRAM when the
+   card had only 15 GB left). The clean number still needs strata stopped.
 4. **Whether Hy4's n-gram table and CYBER-FROST's table can share page cache
    with everything else** on a single NVMe while strata's 26.8 GiB PLE table is
    also mapped — they cannot run together, but the swap sequence is untested.

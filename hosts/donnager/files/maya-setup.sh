@@ -18,9 +18,17 @@
 # Two copied files are enough - devShells.maya only uses the locked nixpkgs input -
 # and a directory is a path flake, so nothing has to be owned.
 #
-# ~254 GB of downloads, from Hugging Face, into /home/maya/models. The build
-# itself is 20-40 minutes. Nothing here is automatic: read what it prints.
+# ~245 GB of downloads (measured: Hy4 Maya-M 131.8 GB), from Hugging Face, into
+# /home/maya/models. The build itself is 20-40 minutes. Nothing here is automatic:
+# read what it prints.
 set -eu
+
+# Ctrl+C has to end Maya's dashboard, not this script. The Hy4 setup ends by
+# launching the model in the foreground, and the INT that stopped it killed the
+# whole script too (EXIT=130) with the second model never installed. Maya's own
+# python installs its own SIGINT handler, so it still stops on Ctrl+C; ignoring
+# INT here lets the script carry on with the next model.
+trap '' INT
 
 FLAKE=/etc/nixos                 # donnager's checkout of this repo (its devShell is what we want)
 REPO=https://github.com/mw00/project-maya.git
@@ -93,7 +101,7 @@ fix_venv_tools() {
 # Reuse whatever an existing Maya config carries, then the key file, then make
 # one and print it once (same order as /etc/strata/setup.sh).
 KEY=""
-for cfg in maya-hy4-flash.json maya-cyber-frost.json; do
+for cfg in maya-*.json; do
   if [ -f "$cfg" ]; then
     KEY=$(sed -n 's/.*"api_key": "\([^"]*\)".*/\1/p' "$cfg" | head -1)
     [ -n "$KEY" ] && break
@@ -112,17 +120,21 @@ fi
 
 # --- model 1: Hy4-Flash (Maya-M) -------------------------------------------
 # --yes takes the recommended answers; --download-model is what actually lets
-# it start the ~141 GB download. Maya builds the maya-hy4 engine first.
+# it start the ~132 GB download; --no-start ends the setup without launching the
+# dashboard (without it the setup starts Maya in the foreground and the script
+# waits there - Ctrl+C then takes the script down too, EXIT=130, measured).
+# Maya names the config after the setup model: hy4-flash-maya-m wrote
+# maya-hy4-flash-maya-m.json, whose own model_name is "hy4-flash".
 echo "=== setup: $HY4_MODEL"
 hy4_setup() {
   if [ -n "$CONTEXT" ]; then
     ./maya.sh --setup --model "$HY4_MODEL" --context "$CONTEXT" \
       --models-dir "$MODELS" --host "$HOST" --port "$PORT" --api-key "$KEY" \
-      --yes --download-model
+      --yes --download-model --no-start
   else
     ./maya.sh --setup --model "$HY4_MODEL" \
       --models-dir "$MODELS" --host "$HOST" --port "$PORT" --api-key "$KEY" \
-      --yes --download-model
+      --yes --download-model --no-start
   fi
 }
 
@@ -137,13 +149,13 @@ if ! hy4_setup; then
 fi
 
 # --- model 2: Qwen-3.8-Flash-Next (CYBER-FROST) ----------------------------
-# A second --setup writes maya-cyber-frost.json beside the Hy4 one; the Models
-# page and /v1/models then list both. UNVERIFIED on this box until the first
-# run: check `ls maya-*.json` shows both before trusting it (docs/maya.md §5).
+# A second --setup writes its own maya-<model>.json beside the Hy4 one; the
+# Models page and /v1/models then list both. Check `ls maya-*.json` shows both
+# before trusting it (docs/maya.md §5).
 echo "=== setup: $QWEN_MODEL"
 ./maya.sh --setup --model "$QWEN_MODEL" \
   --models-dir "$MODELS" --host "$HOST" --port "$PORT" --api-key "$KEY" \
-  --yes --download-model
+  --yes --download-model --no-start
 
 # --- calibrate by hand, once ------------------------------------------------
 # A service start measures nothing (nobody is there to wait), so upstream says
@@ -152,7 +164,7 @@ echo "=== setup: $QWEN_MODEL"
 case "${CALIBRATE:-1}" in
   0) echo "CALIBRATE=0: skipped the speed calibration" ;;
   *)
-    for cfg in maya-hy4-flash.json maya-cyber-frost.json; do
+    for cfg in maya-*.json; do
       if [ -f "$cfg" ]; then
         echo "=== speed calibration: $cfg (5-30 minutes, Maya must be stopped)"
         ./maya.sh --config "$cfg" --speed-calibration --no-start || \
@@ -193,7 +205,7 @@ echo "--- configs Maya wrote (these are the unit's startConfig candidates) ---"
 ls -1 "$SRC"/maya-*.json 2>/dev/null || echo "none: the setup did not finish"
 
 echo "--- what each config is sized for ---"
-for cfg in "$SRC"/maya-hy4-flash.json "$SRC"/maya-cyber-frost.json; do
+for cfg in "$SRC"/maya-*.json; do
   [ -f "$cfg" ] || continue
   echo "  $(basename "$cfg")"
   grep -E -- '"model_name"|"host"|"port"|"max-context"|"idle_unload_s"' "$cfg" | sed 's/^/    /'
@@ -201,7 +213,7 @@ done
 
 cat <<EOF
 next steps
-  cd $SRC && ./maya.sh --config maya-hy4-flash.json          # start it by hand first, watch the load lines
+  cd $SRC && ./maya.sh --config maya-hy4-flash-maya-m.json   # start it by hand first, watch the load lines
   curl -s -H "Authorization: Bearer \$KEY" http://127.0.0.1:$PORT/v1/models
   ls -l $MODELS                                               # Hy4 Maya-M ~141G, CYBER-FROST ~113G
   nvidia-smi --query-gpu=memory.used,memory.free --format=csv

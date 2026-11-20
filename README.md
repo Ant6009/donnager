@@ -24,7 +24,8 @@ local LLM inference server.
 | open-terminal | 8000 | agent computer for Open WebUI; 127.0.0.1 only, no open port |
 
 Models live in `/var/lib/llama/models/` (not in git — see `.gitignore`);
-Maya's models live in `/home/maya/models` (~254 GB, on `nvme0n1p4`).
+Maya's models live in `/home/maya/models` (~245 GB measured for both model sets,
+on `nvme0n1p4`).
 llama-swap unloads models after 15 min idle to free VRAM; each model pins its
 own context size / quantization / chat template (Qwen uses the pinned
 froggeric fixed chat template, fetched by hash).

@@ -22,6 +22,13 @@ in
       wantedBy = [ "multi-user.target" ];
       after = [ "network-online.target" ];
 
+      # Maya (hosts/donnager/maya.nix) pins nearly all the free RAM for its
+      # expert tier and strata alone is 56.4 GiB RSS of 94 GiB (§4.5): the two
+      # never run together. Conflicts= both ways, so `systemctl start maya`
+      # stops strata instead of OOMing the box, and `systemctl start strata`
+      # is the fallback from Maya without a rebuild (docs/maya.md §4.4).
+      conflicts = [ "llama-swap.service" ] ++ lib.optionals config.services.maya.enable [ "maya.service" ];
+
       serviceConfig = {
         User = "strata";
         Group = "strata";

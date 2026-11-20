@@ -13,6 +13,7 @@
     ./searx.nix
     ./llama-swap.nix
     ./strata.nix
+    ./maya.nix
     ./t2fanrd.nix
     ./caddy.nix
     ../../modules/git/default.nix
@@ -25,6 +26,15 @@
   # /var/lib/strata (docs/strata.md); the card can only hold one big model
   # at a time, so this and llama-swap's preload are mutually exclusive.
   services.strata.enable = true;
+
+  # Project Maya (Hy4-Flash Maya-M + Qwen-3.8-Flash-Next CYBER-FROST) on port
+  # 8080: one engine, both models, switching by model name instead of by
+  # service (docs/maya.md §4.4). Out-of-tree build in /home/maya.
+  # Off until docs/maya.md §4.2 has been run by hand: with this on, Maya starts
+  # at boot and strata is not pulled in (the three units Conflicts= each other,
+  # so `systemctl start strata` is the fallback without a rebuild).
+  # Flip both flags together: maya true, strata false.
+  services.maya.enable = false;
 
   # ---- Boot ----------------------------------------------------------------
   boot.loader.systemd-boot.enable = true;
@@ -54,18 +64,19 @@
   networking.nameservers = [ "192.168.68.3" ];    # AdGuard LXC
 
   # SSH (keys only, see below) + services used from the LAN:
-  # roci (pi) → mcp-nixos:8001, searxng:8888, llama-swap:9292, strata:8081;
-  # browser → open-webui:3000. The box sits behind the NAT router
+  # roci (pi) → mcp-nixos:8001, searxng:8888, llama-swap:9292, strata:8081,
+  # maya:8080; browser → open-webui:3000. The box sits behind the NAT router
   # (192.168.68.1), so the LAN is the trust boundary; none of these
   # ports are reachable from the internet unless the router forwards
   # them (it doesn't — re-check if that ever changes).
-  # (8080 was a leftover from the deleted llama.nix — nothing listens.)
+  # 8080 is Maya's default port (the old llama.nix leftover is gone: Maya
+  # writes the port into its own config, hosts/donnager/files/maya-setup.sh).
   # 8081 (strata) is opened for pi on rocinante; Open WebUI reaches it
-  # locally. docs/strata.md §4.4.
+  # locally. docs/strata.md §4.4, docs/maya.md §4.4.
   # NixOS's firewall has no per-port source restriction, so per-source
   # lockdown would mean switching to the nftables backend + custom
   # ruleset — not worth it on a NATed single-LAN box.
-  networking.firewall.allowedTCPPorts = [ 22 3000 4242 8001 8888 8081 9292 ];
+  networking.firewall.allowedTCPPorts = [ 22 3000 4242 8001 8888 8080 8081 9292 ];
 
   # ---- Headless / SSH ------------------------------------------------------
   services.openssh = {

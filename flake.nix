@@ -96,5 +96,41 @@
         ({ lib, ... }: { boot.kernelPackages = lib.mkForce t2KernelPackages; })
       ];
     };
+
+    # Build shell for Project Maya's CUDA engines (docs/maya.md §3): nvcc,
+    # libcublas (CMakeLists.txt links CUDA::cublas), and a host compiler nvcc
+    # will take. nixpkgs' stdenv here is gcc 16.2, which nvcc refuses, and Maya
+    # only probes the default g++ plus /usr/bin/g++-N (maya.py toolchain_for),
+    # so gcc13 goes first on PATH and as CC/CXX.
+    #
+    # Build shell only: Maya's engine, .venv and ~254 GB of models live
+    # out-of-tree in /home/maya (hosts/donnager/maya.nix), the same way strata
+    # lives in /var/lib/strata. cudaPackages repackages NVIDIA's own tarballs,
+    # so this is a multi-GB download, not a compile.
+    devShells."${system}".maya = llmPkgs.mkShell {
+      description = "Project Maya build shell (nvcc for sm_80, gcc 13 host compiler)";
+      packages = [
+        llmPkgs.cudaPackages.cuda_nvcc
+        llmPkgs.cudaPackages.cuda_cudart
+        llmPkgs.cudaPackages.libcublas
+        llmPkgs.gcc13
+        llmPkgs.cmake
+        llmPkgs.ninja
+        llmPkgs.gnumake
+        llmPkgs.python3
+        llmPkgs.git
+        llmPkgs.pkg-config
+      ];
+      CC = "${llmPkgs.gcc13}/bin/gcc";
+      CXX = "${llmPkgs.gcc13}/bin/g++";
+      shellHook = ''
+        export PATH="${llmPkgs.gcc13}/bin:$PATH"
+        export CC="${llmPkgs.gcc13}/bin/gcc"
+        export CXX="${llmPkgs.gcc13}/bin/g++"
+        nvcc --version | sed -n 's/.*release \([0-9.]*\).*/nvcc \1/p' | head -1
+        echo "gcc: $(g++ --version | head -1)"
+        echo "Maya takes the CUDA arch from this PC's GPUs (sm_80 here); pass --host-compiler g++ if it ever rejects this one."
+      '';
+    };
   };
 }

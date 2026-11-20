@@ -1,8 +1,15 @@
 # Running Strata (Qwen3.8-Flash-Next) on donnager — work plan
 
-Status: **planning**. Nothing in this doc has been executed yet.
+Status: **deployed**. `services.strata.enable = true`, the unit is active on
+donnerger, pictures are on (`--vision gpu`), and the 256K numbers in §4.5 are
+measured (2026-11-03). The §5 stage-2 env switches are still commented out in
+`hosts/donnager/strata.nix` pending that baseline, and §9's open items stand.
 Research current as of 2026-10-29 against Strata `main` at `46c152a`
 (2026-10-28) and the sm_80 tuning data from issue #3712 / PR #3779.
+
+2026-11-20: Project Maya (docs/maya.md) is the alternative host for the same
+QFN model, on port 8080, with Hy4-Flash beside it. §4.3/§4.4 now describe three
+backends; strata stays enabled until Maya is measured on this card.
 Quant: **IQ3_XXS** (decided 2026-11-03); the model pack is local at
 `/var/lib/llama/models/Qwen3.8flash`.
 Companion to `docs/cmp170hx.md` (the card it runs on); assumes that plan's
@@ -267,21 +274,32 @@ is Nix-managed).
 
 llama-swap is *not* untouched: the two backends cannot share the card, so
 `hosts/donnager/llama-swap.nix` gates its `wantedBy` on `!services.strata.enable`
-and both sides carry `Conflicts=`. With strata enabled, llama-swap is not
+(and, since 2026-11-20, on `!services.maya.enable` too) and both sides carry
+`Conflicts=`. With strata enabled, llama-swap is not
 pulled in at boot, and `systemctl start llama-swap` stops strata instead of
 deadlocking the GPU. Everything that expects 9292 (42's `llm.base_url`, Open
 WebUI's first provider, pi's `llama-swap` provider entry) is dark while
 strata runs — switch with `services.strata.enable = false` and a rebuild, or
 `systemctl start llama-swap` for a throwaway test.
 
+Project Maya (docs/maya.md) joined this arrangement on 2026-11-20: its unit
+carries `conflicts = [ "strata.service" "llama-swap.service" ]`, and both of
+those carry a conditional `maya.service` conflict back, so `systemctl start
+maya` stops strata and `systemctl start strata` is the way back to the engine
+and the tuning this doc records — no rebuild, minutes of load time either way.
+Maya is the alternative host of the same QFN model (`--model cyber-frost`), so
+it is worth measuring against strata rather than assuming either one wins.
+
 ### 4.4 Client-side switching (pi, Open WebUI)
 
-There is no unified router in front of the two backends, so each client
-holds both as named endpoints and switching is one word:
+There is no unified router in front of the backends, so each client
+holds each one as a named endpoint and switching is one word:
 
-- **pi (rocinante):** `~/.pi/agent/models.json` has both providers
-  (`llama-swap` → `:9292`, `strata` → `:8081`). `~/.local/bin/pi-backend
-  [llama-swap|strata]` sets the default (takes effect in a *new* pi
+- **pi (rocinante):** `~/.pi/agent/models.json` holds the backends as named
+  endpoints (`llama-swap` → `:9292`, `strata` → `:8081`, and `maya` → `:8080`
+  once docs/maya.md §4.2 has been run; as of 2026-11-20 the file carries only
+  `strata`). `~/.local/bin/pi-backend [llama-swap|strata|maya]` sets the
+  default (takes effect in a *new* pi
   session; the running one keeps its baked-in `PI_PROVIDER`/`PI_MODEL`),
   or immediately: `pi --provider strata --model qwen3.8-flash-next-iq3_xxs`.
 - **Open WebUI (donnager):** add a second OpenAI provider at

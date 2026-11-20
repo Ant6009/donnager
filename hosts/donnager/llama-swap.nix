@@ -208,13 +208,15 @@ in {
   systemd.services.llama-swap = {
     description = "llama-swap model router";
     # One backend per card. Strata's expert cache takes 39.97 GiB of VRAM at
-    # load and leaves ~11 GiB free (docs/strata.md §4.5), so llama-swap's
-    # ~30 GB preload cannot coexist with it. services.strata.enable is the
-    # single switch: with it on, llama-swap is not pulled in at boot, and
-    # Conflicts= makes a manual `systemctl start llama-swap` stop strata
-    # rather than OOMing the card.
-    wantedBy = lib.mkIf (!(config.services.strata.enable or false)) ["multi-user.target"];
-    conflicts = ["strata.service"];
+    # load and leaves ~11 GiB free (docs/strata.md §4.5), and Maya pins "most
+    # of the free RAM (all but about 6 GB)" for its expert tier (docs/maya.md
+    # §3), so llama-swap's ~30 GB preload cannot coexist with either one.
+    # services.strata.enable / services.maya.enable are the switches: with
+    # either on, llama-swap is not pulled in at boot, and Conflicts= makes a
+    # manual `systemctl start llama-swap` stop the other backend rather than
+    # OOMing the card.
+    wantedBy = lib.mkIf (!(config.services.strata.enable or false) && !(config.services.maya.enable or false)) [ "multi-user.target" ];
+    conflicts = [ "strata.service" ] ++ lib.optionals (config.services.maya.enable or false) [ "maya.service" ];
     after = ["network-online.target"];
     wants = ["network-online.target"];
 

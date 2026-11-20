@@ -296,10 +296,9 @@ There is no unified router in front of the backends, so each client
 holds each one as a named endpoint and switching is one word:
 
 - **pi (rocinante):** `~/.pi/agent/models.json` holds the backends as named
-  endpoints (`llama-swap` → `:9292`, `strata` → `:8081`, and `maya` → `:8080`
-  once docs/maya.md §4.2 has been run; as of 2026-11-20 the file carries only
-  `strata`). `~/.local/bin/pi-backend [llama-swap|strata|maya]` sets the
-  default (takes effect in a *new* pi
+  endpoints (`llama-swap` → `:9292`, `strata` → `:8081`, `maya` → `:8080` — added
+  2026-11-20, dark until docs/maya.md §4.2 has been run). `~/.local/bin/pi-backend
+  [llama-swap|strata|maya|maya-qwen]` sets the default (takes effect in a *new* pi
   session; the running one keeps its baked-in `PI_PROVIDER`/`PI_MODEL`),
   or immediately: `pi --provider strata --model qwen3.8-flash-next-iq3_xxs`.
 - **Open WebUI (donnager):** add a second OpenAI provider at

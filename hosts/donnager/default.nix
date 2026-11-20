@@ -30,11 +30,13 @@
   # Project Maya (Hy4-Flash Maya-M + Qwen-3.8-Flash-Next CYBER-FROST) on port
   # 8080: one engine, both models, switching by model name instead of by
   # service (docs/maya.md §4.4). Out-of-tree build in /home/maya.
-  # Off until docs/maya.md §4.2 has been run by hand: with this on, Maya starts
-  # at boot and strata is not pulled in (the three units Conflicts= each other,
-  # so `systemctl start strata` is the fallback without a rebuild).
-  # Flip both flags together: maya true, strata false.
-  services.maya.enable = false;
+  # This flag only installs the unit; the boot slot is still strata's, so Maya
+  # is installed here but does not start at boot (its wantedBy is gated on
+  # !services.strata.enable, and a ConditionPathExists on /home/maya/src/maya.sh
+  # skips it until §4.2 has actually run). Move the boot slot to Maya by
+  # setting services.strata.enable = false, after docs/maya.md §4.2 is done —
+  # or don't rebuild at all: `systemctl start maya` stops strata and takes over.
+  services.maya.enable = true;
 
   # ---- Boot ----------------------------------------------------------------
   boot.loader.systemd-boot.enable = true;

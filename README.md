@@ -31,8 +31,9 @@ froggeric fixed chat template, fetched by hash).
 
 **One big model at a time.** strata, llama-swap and maya `Conflicts=` each
 other: the card and the 94 GB of RAM only hold one of them. Which one boots is
-`services.strata.enable` / `services.maya.enable` in
-`hosts/donnager/default.nix` plus a rebuild; `systemctl start strata` (or
+`services.strata.enable` (`hosts/donnager/maya.nix` gates its `wantedBy` on the
+negation, so `services.maya.enable = true` only installs the unit) plus a
+rebuild; `systemctl start strata` (or
 `maya`, or `llama-swap`) is the one-command swap without a rebuild — it stops
 the other. Expect minutes either way: Maya pins nearly all the free RAM for its
 expert tier and takes minutes to load and to hand the card back (docs/maya.md

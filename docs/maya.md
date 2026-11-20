@@ -129,11 +129,15 @@ picks one anyway.
 1. Disk: `df -h /home` — needs ~254 GB for both models, ~141 GB for Hy4 alone.
 2. Outbound HTTPS to huggingface.co (the setup prints every download and its
    sha256 before starting it; it continues where a download stopped).
-3. Order matters: the rebuild that imports the module creates the `maya` user,
-   `/home/maya`, `/home/maya/models` and `/etc/maya/setup.sh` **without**
-   starting anything (only `systemd.services.maya` is behind
-   `services.maya.enable`). So: rebuild with `enable = false`, run §4.2, then
-   flip `enable = true` and rebuild again.
+3. **Done 2026-11-20.** The rebuild with `services.maya.enable = true` created
+   uid/gid `maya` (988/986), `/home/maya` 0750 maya:maya, `/home/maya/models`,
+   `/etc/maya/setup.sh` 0755, and opened 8080 (nothing listens on it yet). It
+   started no service and left strata running.
+4. **Done 2026-11-20:** `/home/maya/maya-api.key` (0600, maya-owned) already
+   holds the API key, generated before §4.2 so the pi and Open WebUI clients can
+   be configured first. The setup script's key order is existing config, then
+   this file, then generate, so it reuses this one. pi's copy is in
+   `~/.pi/agent/auth.json` as `maya` (docs/maya.md §4.4).
 
 ### 4.2 One-time setup (on donnager)
 
@@ -182,6 +186,23 @@ way, matched by size and sha256.
 ```nix
 ExecStart = "/home/maya/src/maya.sh --config /home/maya/src/maya-hy4-flash.json";
 ```
+
+**Who owns the boot slot.** The repo's existing rule is kept: `services.strata.enable`
+alone decides what boots (`hosts/donnager/llama-swap.nix` gates its `wantedBy` the
+same way). `services.maya.enable = true` only **installs** the unit; its
+`wantedBy` is `lib.mkIf (!config.services.strata.enable) [ "multi-user.target" ]`.
+So Maya is installed now and starts at boot only when strata is switched off.
+Moving to it afterwards is either that one flag plus a rebuild, or nothing at all:
+`systemctl start maya` stops strata through `Conflicts=`. Verified by eval:
+with both flags on, `wantedBy` is empty for maya and `multi-user.target` for
+strata.
+
+**The guard that makes installing early safe.** `unitConfig.ConditionPathExists =
+"/home/maya/src/maya.sh"`. Without it, an enabled Maya on a box where §4.2 has not
+run would start a unit that cannot run, and `Conflicts=` plus
+`Restart = "on-failure"` would drop strata every 30 seconds, leaving no inference
+server at all. A start condition that is not met skips the unit without it ever
+activating: no conflict, no restart loop.
 
 - Port, host and API key are **not** in the unit: they are in the config the
   setup script wrote. Passing `--port` to `maya.sh --config ...` is not what
@@ -241,13 +262,15 @@ sessions instead of holding 76 GB of pinned tier overnight.
 
 **Clients.**
 
-- **pi (rocinante):** one provider `maya` in `~/.pi/agent/models.json`,
-  `baseUrl http://192.168.68.128:8080/v1`, two model entries
-  (`hy4-flash`, `cyber-frost-3.8-ps`), and the key in
+- **pi (rocinante):** configured 2026-11-20. Provider `maya` in
+  `~/.pi/agent/models.json`, `baseUrl http://192.168.68.128:8080/v1`, two model
+  entries (`hy4-flash` at 32K, `cyber-frost-3.8-ps` at 128K; **both context
+  windows are placeholders** — set them to what §4.2 actually writes), the key in
   `~/.pi/agent/auth.json` as `{"maya":{"type":"api_key","key":"..."}}` (0600,
-  outranks env vars). `~/.local/bin/pi-backend [llama-swap|strata|maya]` sets
-  the default for a NEW session; `pi --provider maya --model hy4-flash` is the
-  immediate form.
+  outranks env vars), and `~/.local/bin/pi-backend [llama-swap|strata|maya|maya-qwen]`
+  sets the default for a NEW session (`maya` → `hy4-flash`, `maya-qwen` →
+  `cyber-frost-3.8-ps`); `pi --provider maya --model hy4-flash` is the immediate
+  form. Nothing on 8080 answers until §4.2 has run.
 - **Open WebUI (donnager):** Maya is an OpenAI-compatible endpoint at
   `http://127.0.0.1:8080/v1`; add it as a provider in the UI (per-chat pick).
   With `--host 0.0.0.0` it answers `401 missing or wrong API key` without one,
@@ -256,13 +279,19 @@ sessions instead of holding 76 GB of pinned tier overnight.
 **Back to strata (the fallback).** `sudo systemctl start strata` stops maya
 (`Conflicts=` both ways) and starts QFN on 8081 with the engine tuned in
 docs/strata.md; `systemctl start llama-swap` for the dense Qwen3.8-27B on 9292.
-Persistent choice is the two flags in `hosts/donnager/default.nix`
-(`services.maya.enable` / `services.strata.enable`) plus a rebuild — one backend
-is `wantedBy` at boot, the others are started by hand. Budget minutes for a
+Persistent choice is one flag in `hosts/donnager/default.nix`:
+`services.strata.enable = true` owns the boot slot (Maya is installed but not
+`wantedBy`), `false` hands the boot to Maya — then rebuild. Without a rebuild the
+hand-over is `systemctl start maya` / `systemctl start strata`. Budget minutes for a
 swap in either direction: Maya's load and unload are slow (§4.3), strata's park
 and checkpoint paths are the fast ones.
 
 ## 5. Not verified on this box yet
+
+Installed and checked so far (2026-11-20): the module evaluates and activates the
+user, directories, setup script and firewall rule; `/etc/maya/setup.sh` is on the
+box; the pi provider exists; `systemctl start maya` is wired to stop strata. Not
+done: §4.2 (engine build, model downloads, calibration), so nothing listens on 8080.
 
 Everything below is a claim from upstream's docs, not a measurement here:
 

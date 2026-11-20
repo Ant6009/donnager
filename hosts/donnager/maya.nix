@@ -89,7 +89,13 @@ let
     lib.mkIf cfg.enable {
       systemd.services.maya = {
         description = "Project Maya inference engine (Hy4-Flash / Qwen-3.8-Flash-Next, port 8080)";
-        wantedBy = [ "multi-user.target" ];
+        # The boot slot stays a single switch, the way llama-swap's already is
+        # (hosts/donnager/llama-swap.nix gates its wantedBy the same way):
+        # services.strata.enable = true owns the boot, false hands it to Maya.
+        # services.maya.enable alone only *installs* the unit, so it is safe to
+        # turn on before §4.2 has run. Moving to Maya afterwards is one flag, or
+        # no rebuild at all: `systemctl start maya` stops strata.
+        wantedBy = lib.mkIf (!config.services.strata.enable) [ "multi-user.target" ];
         after = [ "network-online.target" ];
         wants = [ "network-online.target" ];
 
@@ -100,6 +106,16 @@ let
         # `systemctl start strata` hands the card and the RAM over instead of
         # OOMing the box.
         conflicts = [ "strata.service" "llama-swap.service" ];
+
+        unitConfig = {
+          # services.maya.enable = true is also the flag that says "§4.2 has
+          # run". Flipping it while /home/maya/src does not exist would start a
+          # unit that cannot run, and Conflicts= would then take strata down
+          # every 30 s (Restart=on-failure), leaving the box with no inference
+          # server. A start condition that is not met skips the unit without it
+          # ever activating: no conflict, no restart loop, strata untouched.
+          ConditionPathExists = "${cfg.srcDir}/maya.sh";
+        };
 
         serviceConfig = {
           User = "maya";
